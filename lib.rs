@@ -287,16 +287,6 @@ mod usuarios_sistema {
             }
         }
 
-
-        fn _get_user(&self, id:AccountId)-> Result<Usuario, ErrorSistema>{
-
-            if let Some(user) = self.usuarios.get(&id) {
-                Ok(user.clone())
-            } else {
-                Err(ErrorSistema::UsuarioNoExiste)
-            }
-        }
-
         // Producto
         fn existe_producto(&self, id: u128) -> bool {
             self.proximo_id_producto > id
