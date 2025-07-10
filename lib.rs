@@ -18,9 +18,9 @@ mod usuarios_sistema {
         publicaciones: Vec<Publicacion>,
         productos: Mapping<u128, Producto>,
         ordenes: Vec<OrdenCompra>,
-        ultimo_id_publicacion: u128,
-        ultimo_id_producto: u128,
-        ultimo_id_orden: u128,
+        proximo_id_publicacion: u128,
+        proximo_id_producto: u128,
+        proximo_id_orden: u128,
     }
 
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
@@ -68,7 +68,10 @@ mod usuarios_sistema {
         //productos: Option<Producto>, //Si es vendedor tiene que tener una lista de sus productos.
         //orden_compra: Option<OrdenDeCompra>, //Si es comprador tiene que tener una orden de compra.
         //Duda: Tendría que tener un historial de sus propias transacciones?
-        publicaciones: Vec<u128>
+        publicaciones: Vec<u128>,
+
+        // Vector con la posicion en el vector del sistema 
+        ordenes: Vec<u128>,
     }
     
     
@@ -172,7 +175,7 @@ mod usuarios_sistema {
         /// Constructor that initializes the `bool` value to the given `init_value`.
         #[ink(constructor)]
         pub fn new() -> Self {
-            Self {  usuarios: Mapping::new(), publicaciones: Vec::<Publicacion>::new(), productos: Mapping::new(), ordenes:Vec::new(), ultimo_id_publicacion: 0, ultimo_id_producto: 0 , ultimo_id_orden: 0}
+            Self {  usuarios: Mapping::new(), publicaciones: Vec::<Publicacion>::new(), productos: Mapping::new(), ordenes:Vec::new(), proximo_id_publicacion: 0, proximo_id_producto: 0 , proximo_id_orden: 0}
         }
 
         /// Constructor that initializes the `bool` value to `false`.
@@ -262,7 +265,7 @@ mod usuarios_sistema {
                 return Err(ErrorSistema::UsuarioYaRegistrado);
             }                
             
-            self.usuarios.insert(id, &Usuario {nombre, apellido, email, id, rol, publicaciones: Vec::<u128>::new()});
+            self.usuarios.insert(id, &Usuario {nombre, apellido, email, id, rol, publicaciones: Vec::<u128>::new(), ordenes: Vec::<u128>::new()});
             Ok(())
         }
 
@@ -296,14 +299,15 @@ mod usuarios_sistema {
 
         // Producto
         fn existe_producto(&self, id: u128) -> bool {
-            self.ultimo_id_producto <= id
+            self.proximo_id_producto > id
         }
 
         fn generar_id_producto(&mut self) -> Result<u128, ErrorSistema> {
-            match self.ultimo_id_producto.checked_add(1) {
+            let proximo = self.proximo_id_producto.clone();
+            match self.proximo_id_producto.checked_add(1) {
                 Some(val) => {
-                    self.ultimo_id_producto = val;
-                    Ok(self.ultimo_id_producto)
+                    self.proximo_id_producto = val;
+                    Ok(proximo)
                 }
                 None => Err(ErrorSistema::ProductosLleno)
             }
@@ -328,10 +332,11 @@ mod usuarios_sistema {
 
         // Publicación
         fn generar_id_publicacion(&mut self) -> Result<u128, ErrorSistema> {
-            match self.ultimo_id_publicacion.checked_add(1) {
+            let proximo = self.proximo_id_publicacion.clone();
+            match self.proximo_id_publicacion.checked_add(1) {
                 Some(val) => {
-                    self.ultimo_id_publicacion = val;
-                    Ok(self.ultimo_id_publicacion)
+                    self.proximo_id_publicacion = val;
+                    Ok(proximo)
                 }
                 None => Err(ErrorSistema::PublicacionesLleno)
             }
@@ -354,6 +359,11 @@ mod usuarios_sistema {
                 return Err(ErrorSistema::ProductoInvalido);
             }
 
+            let mut usuario = match self.usuarios.get(&usuario_id) {
+                Some(u) => u,
+                None => return Err(ErrorSistema::UsuarioNoExiste),
+            };
+
             // Agrego la publicación
             let id_publicacion = self.generar_id_publicacion()?;
 
@@ -367,10 +377,7 @@ mod usuarios_sistema {
             });
 
             // Agrego la publicación a la lista de publicaciones del usuario
-            let mut usuario = match self.usuarios.get(&usuario_id) {
-                Some(u) => u,
-                None => return Err(ErrorSistema::UsuarioNoExiste),
-            };
+            
 
             usuario.publicaciones.push(id_publicacion);
 
@@ -380,7 +387,8 @@ mod usuarios_sistema {
                 email: usuario.email,
                 id: usuario.id,
                 rol: usuario.rol,
-                publicaciones: usuario.publicaciones
+                publicaciones: usuario.publicaciones,
+                ordenes: usuario.ordenes,
             });
 
             Ok(())
@@ -430,8 +438,8 @@ mod usuarios_sistema {
             let lista_compra = self.actualizar_stock_de_orden(lista_publicaciones_con_cantidades);
 
 
-            let id_orden = self.ultimo_id_orden.clone();
-            self.aumentar_id_orden()?;
+            let id_orden = self.generar_id_orden()?;
+            
 
             // Creo la orden
 
@@ -441,24 +449,30 @@ mod usuarios_sistema {
             // Por ahora solo estoy agregando la orden a el vector global de ordenes, no se si cada usuario deberia tener su propio vec de ordenes.
             // si los tuviera, como funciona? Por la orden es una sola entonces solo deberiamos guardar la referencia?
 
-            // self.agregar_orden_usuario(caller, orden.clone());
-            // self.agregar_orden_usuario(vendedor_actual, orden.clone());
-
+            
             // Agrego la orden al vector de ordenes
             self.ordenes.push(orden.clone());
+        
+            // Agrego al vector de ambos usuarios
+            self.agregar_orden_usuario(caller, id_orden)?;
+            self.agregar_orden_usuario(vendedor_actual, id_orden);
+
 
             Ok(orden.clone())
             
         }
 
-        // fn agregar_orden_usuario(&mut self, user_id:AccountId, orden:OrdenCompra){
-        //     if let Some(user) = self.usuarios.get(user_id){
-        //         let mut modificado = user.clone();
-        //         modificado.ordenes.push(orden);
-        //         self.usuarios.insert(user_id, &modificado);
-        //     }
+        fn agregar_orden_usuario(&mut self, user_id:AccountId, id_orden:u128)->Result<(), ErrorSistema>{
+            if let Some(mut user) = self.usuarios.get(&user_id){
+                user.ordenes.push(id_orden);
+                self.usuarios.insert(&user_id, &user);
+                return Ok(())
+            }
+            else {
+                return Err(ErrorSistema::UsuarioNoExiste);
+            }
 
-        // }
+        }
 
         fn validar_orden(&self, lista_publicaciones_con_cantidades:Vec<(u128, u32)>, vendedor_actual:AccountId)->Result<(), ErrorSistema>{
             // Itero sobre la lista de publicaciones con cantidades y voy checkeando si la compra es valida(id de publicaciones valida y cant valida)
@@ -497,11 +511,12 @@ mod usuarios_sistema {
         
         }
 
-        fn aumentar_id_orden(&mut self)->Result<(), ErrorSistema>{
-            match self.ultimo_id_orden.checked_add(1){
+        fn generar_id_orden(&mut self)->Result<u128, ErrorSistema>{
+            let proximo = self.proximo_id_orden.clone();
+            match self.proximo_id_orden.checked_add(1){
                 Some(val) => {
-                    self.ultimo_id_orden = val;
-                    Ok(())
+                    self.proximo_id_orden = val;
+                    Ok(proximo)
                 }
                 None => Err(ErrorSistema::PublicacionesLleno)
             }
@@ -616,6 +631,25 @@ mod usuarios_sistema {
         #[ink(message)]
         pub fn get_publicaciones(&self)->Vec<Publicacion>{
             self.publicaciones.clone()
+        }
+
+        #[ink(message)]
+        pub fn ver_mis_ordenes(&self)->Vec<OrdenCompra>{
+            let caller = self.env().caller();
+            self._ver_mis_ordenes(caller)
+        }
+
+        fn _ver_mis_ordenes(&self, caller:AccountId)->Vec<OrdenCompra>{
+            let mut mis_ordenes = Vec::new();
+            if let Some(user) = self.usuarios.get(caller){
+                for id in user.ordenes {
+                    if let Some(orden) = self.ordenes.get(id as usize){
+                        mis_ordenes.push(orden.clone())
+                    }
+                    
+                }
+            }
+            mis_ordenes
         }
     }
 
@@ -818,16 +852,17 @@ mod usuarios_sistema {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
             sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
 
-            sistema.nuevo_producto("banana".to_string(), "una banana".to_string(), Categoria::Limpieza);
+            if let Ok(id) = sistema.nuevo_producto("banana".to_string(), "una banana".to_string(), Categoria::Limpieza){
+                assert_eq!(id, 0);
+            }
 
-            sistema.crear_publicacion(1, 10, 19);
-
+            sistema.crear_publicacion(0, 10, 19);
             assert_eq!(sistema.get_publicaciones().len(), 1);
 
             assert_eq!(sistema.publicaciones[0].tiene_stock_suficiente(20), false);
 
             let mut lista_compra = Vec::new();
-            lista_compra.push((1,2));
+            lista_compra.push((0,2));
 
 
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
