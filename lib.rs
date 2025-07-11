@@ -50,6 +50,8 @@ mod usuarios_sistema {
         NoPuedeComprarPublicacionPropia,
         OperacionNoValida,
         CancelacionYaSolicitada,
+        DineroInsuficiente,
+        FueraDeRango,
     }
    
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
@@ -154,7 +156,7 @@ mod usuarios_sistema {
 
         solicitud_cancelacion: Option<AccountId>,
 
-
+        monto:u32,
 
     }
 
@@ -386,13 +388,13 @@ mod usuarios_sistema {
 
         // Orden de compra
         #[ink(message)]
-        pub fn generar_orden_compra(&mut self, lista_publicaciones_con_cantidades:Vec<(u128, u32)>)->Result<OrdenCompra, ErrorSistema>{
+        pub fn generar_orden_compra(&mut self, lista_publicaciones_con_cantidades:Vec<(u128, u32)>, dinero_disponible: u32)->Result<OrdenCompra, ErrorSistema>{
             let caller = self.env().caller();
-            return self._generar_orden_compra(lista_publicaciones_con_cantidades, caller);
+            return self._generar_orden_compra(lista_publicaciones_con_cantidades, dinero_disponible, caller);
         }
         
         // Recibe un vector con las publicaciones y la cantidad de cada una para armar la orden.
-        fn _generar_orden_compra(&mut self, lista_publicaciones_con_cantidades:Vec<(u128, u32)> , caller:AccountId) -> Result<OrdenCompra, ErrorSistema>{
+        fn _generar_orden_compra(&mut self, lista_publicaciones_con_cantidades:Vec<(u128, u32)> , dinero_disponible:u32, caller:AccountId) -> Result<OrdenCompra, ErrorSistema>{
             // Checkeo si el usuario que esta tratando de realizar la compra tiene el rol debido
             
             self.es_vendedor()?;
@@ -422,6 +424,8 @@ mod usuarios_sistema {
             
             self.validar_orden(lista_publicaciones_con_cantidades.clone(), vendedor_actual.clone())?;
 
+            let monto_total = self.validar_precio(lista_publicaciones_con_cantidades.clone(), dinero_disponible)?;
+
 
             // Una vez pasadas todas las validaciones, actualizo el stock
 
@@ -433,7 +437,7 @@ mod usuarios_sistema {
 
             // Creo la orden
 
-            let orden = OrdenCompra{id_comprador:caller, lista_productos:lista_compra, id_orden_compra:id_orden, estado:EstadoOrdenCompra::Pendiente, id_vendedor:vendedor_actual, solicitud_cancelacion:None};
+            let orden = OrdenCompra{id_comprador:caller, lista_productos:lista_compra, id_orden_compra:id_orden, estado:EstadoOrdenCompra::Pendiente, id_vendedor:vendedor_actual, solicitud_cancelacion:None, monto:monto_total};
 
 
             // Por ahora solo estoy agregando la orden a el vector global de ordenes, no se si cada usuario deberia tener su propio vec de ordenes.
@@ -499,6 +503,33 @@ mod usuarios_sistema {
             }
             Ok(())
         
+        }
+
+        fn validar_precio(&self, lista_publicaciones_con_cantidades:Vec<(u128, u32)>, dinero_disponible: u32)->Result<u32, ErrorSistema>{
+            let mut monto_total:u32=0;
+            for (id_publicacion, cant_productos) in lista_publicaciones_con_cantidades {
+                if let Some(publicacion_actual) = self.publicaciones.get(id_publicacion as usize){
+
+                    let monto_actual = match publicacion_actual.precio.checked_mul(cant_productos) {
+                        Some(val) => val,
+                        None => return Err(ErrorSistema::FueraDeRango),
+                    };
+                    match monto_total.checked_add(monto_actual) {
+                        Some(val) => monto_total = val,
+                        None => return Err(ErrorSistema::FueraDeRango),
+                    }
+                }
+                else {
+                    return Err(ErrorSistema::PublicacionNoValida);
+                }
+            }
+
+            if dinero_disponible >= monto_total {
+                return Ok(monto_total)
+            }
+            else {
+                return Err(ErrorSistema::DineroInsuficiente);
+            }
         }
 
         fn generar_id_orden(&mut self)->Result<u128, ErrorSistema>{
@@ -859,7 +890,11 @@ mod usuarios_sistema {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
 
-            assert!(sistema.generar_orden_compra(lista_compra).is_ok());
+            if let Err(e) = sistema.generar_orden_compra(lista_compra.clone(), 1) {
+                assert_eq!(e, ErrorSistema::DineroInsuficiente);
+            }
+            
+            assert!(sistema.generar_orden_compra(lista_compra, 200).is_ok());
 
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
 
