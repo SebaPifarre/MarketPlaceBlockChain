@@ -9,9 +9,26 @@ mod usuarios_sistema {
 
     #[ink(storage)]
 
-    /// Defines the storage of your contract.
-    /// Add new fields to the below struct in order
-    /// to add new static storage fields to your contract.
+    /// # Este es la estructura del sistema edl MarketPlace
+    /// Estructura principal de almacenamiento del contrato marketplace.
+    ///
+    /// `Sistema` contiene toda la información persistente del contrato, incluyendo usuarios, productos,
+    /// publicaciones, órdenes y los contadores para generar nuevos IDs únicos.
+    ///
+    /// # Campos
+    /// - `usuarios`: Mapeo de AccountId a struct Usuario, representa todos los usuarios registrados.
+    /// - `publicaciones`: Vector con todas las publicaciones activas en el sistema.
+    /// - `productos`: Mapeo de id de producto a struct Producto, representa todos los productos creados.
+    /// - `ordenes`: Vector con todas las órdenes de compra generadas.
+    /// - `proximo_id_publicacion`: Contador para el próximo id único de publicación.
+    /// - `proximo_id_producto`: Contador para el próximo id único de producto.
+    /// - `proximo_id_orden`: Contador para el próximo id único de orden de compra.
+    ///
+    /// # Ejemplo de uso
+    /// ```
+    ///      let sistema = Sistema::new();
+    ///      sistema.registrar_usuario("Juan".to_string(), "Perez".to_string(), "juan@email.com".to_string(), Rol::Comprador);
+    /// ```
     pub struct Sistema {
         usuarios: ink::storage::Mapping<AccountId, Usuario>,
         //historial_transacciones: ink::storage::StorageVec<transaccion>, //-> Hay que tener un struct para transaccion???
@@ -51,7 +68,10 @@ mod usuarios_sistema {
         OperacionNoValida,
         CancelacionYaSolicitada,
     }
-   
+
+    /// # Esta es la estructura de un usuario.
+    /// Representa un usuario del sistema de marketplace.
+    /// Contiene información personal, rol, publicaciones y órdenes asociadas.
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
         feature = "std",
@@ -60,17 +80,29 @@ mod usuarios_sistema {
     #[derive(Clone, PartialEq, Eq, Debug)]
 
     pub struct Usuario{
+        /// Nombre del Usuario
         nombre:String,
+
+        /// Apellido del Usuario
         apellido:String,
+
+        /// Correo electronico del Usuario
         email:String,
+
+        /// Codigo identificador (AccountID) del usuario
         id:AccountId,
+
+        /// Ocupacion que tiene el Usuario en la pagina
         rol: Rol,
+
         //productos: Option<Producto>, //Si es vendedor tiene que tener una lista de sus productos.
         //orden_compra: Option<OrdenDeCompra>, //Si es comprador tiene que tener una orden de compra.
         //Duda: Tendría que tener un historial de sus propias transacciones?
+
+        /// Lista de Publicaciones (Id de publicaciones) que tiene un Usuario ´Vendedor´
         publicaciones: Vec<u128>,
 
-        // Vector con la posicion en el vector del sistema 
+        /// Lista de ´Ordenes de Compra´ (Id de Ordenes de compra) que tiene un Usuario ´Comprador´
         ordenes: Vec<u128>,
     }
     
@@ -88,17 +120,25 @@ mod usuarios_sistema {
         Ambos,
     }
 
-    // Producto
+    /// # Esta es la estructura de un Producto.
+    /// Representa un producto en una publicacion de marketplace.
+    /// 
+    /// Contiene el nombre, descripcion y la categoria de este.
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
         feature = "std",
         derive(ink::storage::traits::StorageLayout)
     )]
     pub struct Producto{
+
         nombre: String,
+        
         descripcion: String,
+
         categoria: Categoria,
     }
+
+
 
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
@@ -117,6 +157,31 @@ mod usuarios_sistema {
 
     // Publicación
 
+
+    /// Representa una publicación en el marketplace.
+    /// 
+    /// Cada publicación está asociada a un producto específico y a un usuario vendedor.
+    /// Contiene información relevante para la venta, como el precio, el stock disponible y el estado de la publicación.
+    ///
+    /// # Campos
+    /// - `id_publicacion`: Identificador único de la publicación.
+    /// - `id_producto`: Identificador del producto publicado.
+    /// - `id_publicador`: AccountId del usuario que publica (vendedor).
+    /// - `precio`: Precio del producto en la publicación.
+    /// - `stock`: Cantidad disponible para la venta.
+    /// - `activa`: Indica si la publicación está activa o no.
+    ///
+    /// # Ejemplo de uso
+    /// ```
+    ///      let publicacion = Publicacion {
+    ///        id_publicacion: 1,
+    ///        id_producto: 10,
+    ///        id_publicador: AccountId::from([0x1; 32]),
+    ///        precio: 1000,
+    ///        stock: 5,
+    ///        activa: true,
+    ///      };
+    /// ```
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
         feature = "std",
@@ -139,8 +204,10 @@ mod usuarios_sistema {
         derive(ink::storage::traits::StorageLayout)
     )]
     pub struct OrdenCompra {
-        // El vec lo pense con un vec de tuplas, con el id del producto y la cantidad comprada.
+        
+
         lista_productos: Vec<(u128, u32)>,
+        // El vec lo pense con un vec de tuplas, con el id del producto y la cantidad comprada.
 
         // Se me ocurre que dentro del usuario podemos tener un vec de ordenes de compra
         // y para acceder a una en especifica que se use el id de orden
@@ -172,22 +239,25 @@ mod usuarios_sistema {
     }
 
     impl Sistema {
-        /// Constructor that initializes the `bool` value to the given `init_value`.
+
+        // # Sistema::new()
+        /// Crea una nueva instancia del sistema, inicializando los campos de almacenamiento.
+        /// No recibe parámetros.
+        /// Retorna una instancia de Sistema.
+        /// El new, inicializa todos los campos del sistema en un estado Default.
+        /// # Ejemplo
+        /// ```
+        ///      let sistema = Sistema::new();
+        /// ```
         #[ink(constructor)]
         pub fn new() -> Self {
             Self {  usuarios: Mapping::new(), publicaciones: Vec::<Publicacion>::new(), productos: Mapping::new(), ordenes:Vec::new(), proximo_id_publicacion: 0, proximo_id_producto: 0 , proximo_id_orden: 0}
         }
 
-        /// Constructor that initializes the `bool` value to `false`.
-        ///
-        /// Constructors can delegate to other constructors.
-        /*#[ink(constructor)]
-        pub fn default() -> Self {
-            Self::new()
-        }*/
 
 
-        //Verificadores del sistema.
+        /// Verifica si el usuario que llama existe.
+        /// Retorna `Ok(true)` si existe, o un error si no existe.
         fn _existe_usuario(&self, id: AccountId) -> Result<bool, ErrorSistema> {
             if self.usuarios.get(&id).is_some() {
                 Ok(true)
@@ -196,6 +266,15 @@ mod usuarios_sistema {
             }
         }
 
+
+        /// !Es_Vendedor()
+        /// Verifica si el usuario que llama es vendedor o tiene ambos roles.
+        /// Retorna `Ok(true)` si es vendedor o ambos, `Ok(false)` si no lo es, o un error si no existe.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///      let es_vendedor = sistema.es_vendedor();
+        /// ```
         #[ink(message)]
         pub fn es_vendedor(&self) -> Result<bool, ErrorSistema> { //Duda: Está bien recibirlo como parámetro al id o lo tengo que obtener del caller?
             //Duda: Debería preguntar acá o en el privado si el usuario existe?
@@ -222,7 +301,15 @@ mod usuarios_sistema {
             }
         }
 
-        //Mismas dudas que en es_vendedor.
+
+        /// !Es_Comprador()
+        /// Verifica si el usuario que llama es comprador o tiene ambos roles.
+        /// Retorna `Ok(true)` si es comprador o ambos, `Ok(false)` si no lo es, o un error si no existe.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///      let es_comprador = sistema.es_comprador();
+        /// ```
         #[ink(message)]
         pub fn es_comprador(&self) -> Result<bool, ErrorSistema> { 
             let id = self.env().caller(); 
@@ -247,8 +334,17 @@ mod usuarios_sistema {
             }
         }
 
-        //Funciones asociadas a usuarios. 
+        //Funciones asociadas a usuarios.
 
+        /// !Registrar_Usuario() 
+        /// Registra un nuevo usuario en el sistema con los datos proporcionados.
+        /// El usuario queda asociado al AccountId del caller.
+        /// Retorna `Ok(())` si el registro fue exitoso, o un error si ya existe.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///      sistema.registrar_usuario("Juan".to_string(), "Perez".to_string(), "juan@email.com".to_string(), Rol::Comprador);
+        /// ```
         #[ink(message)]
         pub fn registrar_usuario(&mut self, nombre:String, apellido:String, email:String, rol:Rol) -> Result<(), ErrorSistema> {
             let id = self.env().caller(); // Se obtiene el AccountId del usuario que llama a la función.
@@ -269,6 +365,15 @@ mod usuarios_sistema {
             Ok(())
         }
 
+
+
+        /// Agrega un rol adicional al usuario que llama.
+        /// Retorna `Ok(())` si el rol fue agregado, o un error si ya lo tiene o no existe.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///      sistema.agregar_rol(Rol::Vendedor);
+        /// ```
         #[ink(message)]
         pub fn agregar_rol(&mut self, rol: Rol) -> Result<(), ErrorSistema> {
             let id = self.env().caller(); // Se obtiene el AccountId del usuario que llama a la función.
@@ -287,7 +392,16 @@ mod usuarios_sistema {
             }
         }
 
-        // Producto
+
+        /// La funcion se fija si la id de un produto es menor al id proximo del producto a
+        /// cargar, comprobando si esta ya fue cargda o no.
+        /// Retorna `true` si el proucto existe, o false si no existe.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///      let id: u64;
+        ///      sistema.existe_producto( id);
+        /// ```
         fn existe_producto(&self, id: u128) -> bool {
             self.proximo_id_producto > id
         }
@@ -303,6 +417,15 @@ mod usuarios_sistema {
             }
         }
 
+
+        /// #nuevo_producto()
+        /// Crea un nuevo producto asociado al usuario que llama (debe ser vendedor).
+        /// Retorna el id del producto creado o un error si no es vendedor.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///     let id_producto = sistema.nuevo_producto("Laptop".to_string(), "Laptop gamer".to_string(), Categoria::Tecnologia)?;
+        /// ```
         #[ink(message)]
         pub fn nuevo_producto(&mut self, nombre: String, descripcion: String, categoria: Categoria) -> Result<u128, ErrorSistema> {
             if let Ok(false) = self.es_vendedor() {
@@ -332,6 +455,17 @@ mod usuarios_sistema {
             }
         }
 
+
+
+        /// #crear_Publicacion()
+        /// Crea una nueva publicación para un producto existente.
+        /// El usuario debe ser vendedor y el producto debe existir.
+        /// Retorna `Ok(())` si la publicación fue creada, o un error en caso contrario.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///     sistema.crear_publicacion(0, 1000, 10);
+        /// ```
         #[ink(message)]
         pub fn crear_publicacion(&mut self, id_producto: u128, precio: u32, stock: u32) -> Result<(), ErrorSistema> {
             self._crear_publicacion(id_producto, precio, stock)?;
@@ -385,6 +519,16 @@ mod usuarios_sistema {
         }
 
         // Orden de compra
+
+
+        /// Genera una nueva orden de compra para el usuario que llama.
+        /// Recibe una lista de tuplas (id_publicacion, cantidad).
+        /// Retorna la orden creada o un error si hay algún problema.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///     let orden = sistema.generar_orden_compra(vec![(0, 2), (1, 1)])?;
+        /// ```
         #[ink(message)]
         pub fn generar_orden_compra(&mut self, lista_publicaciones_con_cantidades:Vec<(u128, u32)>)->Result<OrdenCompra, ErrorSistema>{
             let caller = self.env().caller();
@@ -526,6 +670,16 @@ mod usuarios_sistema {
             lista_productos
         }
 
+
+
+
+        /// Marca una orden como enviada. Solo el vendedor puede hacerlo.
+        /// Retorna `Ok(())` si la operación fue exitosa, o un error si no corresponde.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///      sistema.marcar_orden_como_enviada(0);
+        /// ```
         #[ink(message)]
         pub fn marcar_orden_como_enviada(&mut self, id_actual:u128)->Result<(), ErrorSistema> {
             let caller = self.env().caller();
@@ -554,6 +708,15 @@ mod usuarios_sistema {
             }
         }
 
+
+
+        /// Marca una orden como recibida. Solo el comprador puede hacerlo.
+        /// Retorna `Ok(())` si la operación fue exitosa, o un error si no corresponde.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///      sistema.marcar_orden_como_recibida(0);
+        /// ```
         #[ink(message)]
         pub fn marcar_orden_como_recibida(&mut self, id_actual:u128)->Result<(), ErrorSistema> {
             let caller = self.env().caller();
@@ -582,6 +745,17 @@ mod usuarios_sistema {
             }
         }
 
+
+
+
+        /// Solicita la cancelación de una orden. Puede ser solicitada por comprador o vendedor.
+        /// Si ambos la solicitan, la orden se cancela.
+        /// Retorna `Ok(())` si la operación fue exitosa, o un error si no corresponde.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///      sistema.cancelar_orden(0);
+        /// ```
         #[ink(message)]
         pub fn cancelar_orden(&mut self, id_actual:u128)->Result<(), ErrorSistema> {
             let caller = self.env().caller();
@@ -618,11 +792,28 @@ mod usuarios_sistema {
             }
         }
 
+
+
+
+        /// Devuelve la lista de todas las publicaciones existentes en el sistema.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///      let publicaciones = sistema.get_publicaciones();
+        /// ```
         #[ink(message)]
         pub fn get_publicaciones(&self)->Vec<Publicacion>{
             self.publicaciones.clone()
         }
 
+
+
+        /// Devuelve la lista de órdenes asociadas al usuario que llama.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///   let mis_ordenes = sistema.ver_mis_ordenes();
+        /// ```
         #[ink(message)]
         pub fn ver_mis_ordenes(&self)->Vec<OrdenCompra>{
             let caller = self.env().caller();
