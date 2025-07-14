@@ -399,12 +399,6 @@ mod usuarios_sistema {
             
             self.es_vendedor()?;
 
-            // Verifico que por lo menos exista una compra
-
-            // Consulta: si checkeo asi nunca me deja llamar porque siempre cree que el vector esta vacio
-            // if !lista_publicaciones_con_cantidades.len() > 0 {
-            //     return Err(ErrorSistema::CompraSinItems);
-            // }
 
             // Busco el id del vendedor
             let vendedor_actual:AccountId;
@@ -449,7 +443,7 @@ mod usuarios_sistema {
         
             // Agrego al vector de ambos usuarios
             self.agregar_orden_usuario(caller, id_orden)?;
-            self.agregar_orden_usuario(vendedor_actual, id_orden);
+            self.agregar_orden_usuario(vendedor_actual, id_orden)?;
 
 
             Ok(orden.clone())
@@ -921,6 +915,37 @@ mod usuarios_sistema {
                 assert_eq!(orden.estado, EstadoOrdenCompra::Cancelado);
             }
             
+        }
+    
+        #[ink::test]
+        fn test_calculo_precio(){
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
+            sistema.nuevo_producto("Cif".to_string(), "Cif".to_string(), Categoria::Limpieza);
+            sistema.nuevo_producto("Remera".to_string(), "Remera".to_string(), Categoria::Ropa);
+            sistema.crear_publicacion(0, 10, 19);
+            sistema.crear_publicacion(1, 20, 5);
+
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
+
+            let mut lista_compra = Vec::new();
+            lista_compra.push((0,2));
+            lista_compra.push((1,3));
+
+
+            if let Err(e) = sistema.generar_orden_compra(lista_compra.clone(), 70){
+                assert_eq!(e, ErrorSistema::DineroInsuficiente);
+            }
+
+            if let Ok(ord) = sistema.generar_orden_compra(lista_compra, 200){
+                assert_eq!(ord.monto, 80);
+            }
+
+
         }
     }
 
