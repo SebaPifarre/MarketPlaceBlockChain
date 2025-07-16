@@ -417,7 +417,15 @@ mod usuarios_sistema {
 
             // Creo la orden
 
-            let orden = OrdenCompra{id_comprador:caller, lista_productos:lista_compra, id_orden_compra:id_orden, estado:EstadoOrdenCompra::Pendiente, id_vendedor:vendedor_actual, solicitud_cancelacion:None};
+            let orden = OrdenCompra {
+                id_comprador: caller,
+                lista_productos: lista_compra,
+                id_orden_compra: id_orden,
+                estado: EstadoOrdenCompra::Pendiente,
+                id_vendedor: vendedor_actual,
+                solicitud_cancelacion: None,
+                monto: monto_total,
+            };
             
             // Agrego la orden al vector de ordenes
             self.ordenes.push(orden.clone());
