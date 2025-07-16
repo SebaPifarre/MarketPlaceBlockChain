@@ -223,6 +223,20 @@ mod usuarios_sistema {
         }
 
         //Mismas dudas que en es_vendedor.
+        // Descripción breve de la función
+/// 
+/// Descripción más detallada si es necesaria.
+/// 
+/// # Arguments
+/// 
+/// * `param1` - Descripción del parámetro
+/// * `param2` - Descripción del parámetro
+/// 
+/// # Returns
+/// 
+/// Descripción de lo que retorna
+/// 
+/// # Examples
         #[ink(message)]
         pub fn es_comprador(&self) -> Result<bool, ErrorSistema> { 
             let id = self.env().caller(); 
@@ -644,18 +658,14 @@ mod usuarios_sistema {
     }
 
     impl Usuario {
-        //registrarse. ?? Acá sí que no me quedó clara la parte de delegar.
-        //pub fn crear_publicación
-        //pub fn agregar_a_orden_compra
-        
-        pub fn agregar_rol(&mut self, rol: Rol) -> Result<(), ErrorSistema> { //Hacer un agregar para cada rol distinto..
+        pub fn agregar_rol(&mut self, rol: Rol) -> Result<(), ErrorSistema> { 
             if self.rol == rol {
                 return Err(ErrorSistema::RolYaEnUso);
             }
             // Agrega el nuevo rol al usuario.
             self.rol = match (self.rol.clone(), rol.clone()) {
                 (Rol::Comprador, Rol::Vendedor) | (Rol::Vendedor, Rol::Comprador) => Rol::Ambos,
-                _ => rol, //está de más?
+                _ => rol,
             };
             Ok(())
         }
@@ -856,10 +866,6 @@ mod usuarios_sistema {
 
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
 
-            // if let Err(e) = sistema.marcar_orden_como_enviada(0) {
-            //     assert_eq!(e, ErrorSistema::OperacionNoValida);
-            // }
-
             assert!(sistema.marcar_orden_como_enviada(0).is_ok());
             if let Some(orden) = sistema.ordenes.get(0){
                 assert_eq!(orden.estado, EstadoOrdenCompra::Enviado);
@@ -1002,6 +1008,12 @@ mod usuarios_sistema {
             let error_operacion_no_valida = sistema.marcar_orden_como_enviada(0).unwrap_err();
             assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //El caller no es el vendedor de la orden.
 
+            //Quiero forzar el error de OperacionNoValida porque la orden ya fue enviada.
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            assert!(sistema.marcar_orden_como_enviada(0).is_ok()); //Primero lo marco como enviada.
+            let error_operacion_no_valida = sistema.marcar_orden_como_enviada(0).unwrap_err();
+            assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //La orden ya fue enviada.
+
         }
 
         #[ink::test]
@@ -1054,6 +1066,15 @@ mod usuarios_sistema {
             //Quiero forzar el error de OperacionNoValida.
             let error_operacion_no_valida = sistema.marcar_orden_como_recibida(0).unwrap_err();
             assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //El caller no es el vendedor de la orden.
+
+            //Quiero forzar el error de OperacionNoValida porque la orden ya fue recibida.
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.marcar_orden_como_enviada(0); //Primero lo marco como enviada.
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            assert!(sistema.marcar_orden_como_recibida(0).is_ok()); //Primero lo marco como recibida.
+            let error_operacion_no_valida = sistema.marcar_orden_como_recibida(0).unwrap_err();
+            assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //La orden ya fue recibida.
+            
 
         }
         
