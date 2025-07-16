@@ -6,14 +6,11 @@ edition = "2021"
 
 [dependencies]
 ink = { version = "5.1.1", default-features = false }
-base64ct = "= 1.6.0"
+base64ct = "1.6.0"
 cargo-tarpaulin = "0.32.8"
 
 [dev-dependencies]
 ink_e2e = { version = "5.1.1" }
-# Librerías para generar un AccountId
-# sp-core = { version = "36.1.0", features = ["sr25519"] }
-# rand = "0.8"
 
 [lib]
 path = "lib.rs"
