@@ -711,25 +711,22 @@ mod usuarios_sistema {
         }
 
         fn _marcar_orden_como_enviada(&mut self, id_actual:u128, caller:AccountId)->Result<(), ErrorSistema>{
-            if let Some(pos) = self.ordenes.iter().position(|x| x.id_orden_compra==id_actual){
 
-                if let Some(orden_acutal) = self.ordenes.get_mut(pos){
-                    if orden_acutal.id_vendedor != caller {
-                        return Err(ErrorSistema::OperacionNoValida)
-                    } 
-                    match &orden_acutal.estado {
-                        EstadoOrdenCompra::Pendiente => Ok(orden_acutal.estado = EstadoOrdenCompra::Enviado),
-                        _ => return Err(ErrorSistema::OperacionNoValida),
-                    }
+
+            if let Some(orden_acutal) = self.ordenes.get_mut(id_actual as usize){
+                if orden_acutal.id_vendedor != caller {
+                    return Err(ErrorSistema::OperacionNoValida)
+                } 
+                match &orden_acutal.estado {
+                    EstadoOrdenCompra::Pendiente => Ok(orden_acutal.estado = EstadoOrdenCompra::Enviado),
+                    _ => return Err(ErrorSistema::OperacionNoValida),
+                }
                  
-                }
-                else {
-                    return Err(ErrorSistema::IdDeOrdenNoValida);
-                }
             }
             else {
                 return Err(ErrorSistema::IdDeOrdenNoValida);
             }
+            
         }
 
 
@@ -748,25 +745,22 @@ mod usuarios_sistema {
         }
 
         fn _marcar_orden_como_recibida(&mut self, id_actual:u128, caller:AccountId)->Result<(), ErrorSistema>{
-            if let Some(pos) = self.ordenes.iter().position(|x| x.id_orden_compra==id_actual){
+            
 
-                if let Some(orden_acutal) = self.ordenes.get_mut(pos){
-                    if orden_acutal.id_comprador != caller {
-                        return Err(ErrorSistema::OperacionNoValida)
-                    } 
-                    match &orden_acutal.estado {
-                        EstadoOrdenCompra::Enviado => Ok(orden_acutal.estado = EstadoOrdenCompra::Recibido),
-                        _ => return Err(ErrorSistema::OperacionNoValida),
-                    }
+            if let Some(orden_acutal) = self.ordenes.get_mut(id_actual as usize){
+                if orden_acutal.id_comprador != caller {
+                    return Err(ErrorSistema::OperacionNoValida)
+                } 
+                match &orden_acutal.estado {
+                    EstadoOrdenCompra::Enviado => Ok(orden_acutal.estado = EstadoOrdenCompra::Recibido),
+                    _ => return Err(ErrorSistema::OperacionNoValida),
+                }
                  
-                }
-                else {
-                    return Err(ErrorSistema::IdDeOrdenNoValida);
-                }
             }
             else {
                 return Err(ErrorSistema::IdDeOrdenNoValida);
             }
+            
         }
 
 
@@ -787,33 +781,29 @@ mod usuarios_sistema {
         }
 
         fn _cancelar_orden(&mut self, id_actual:u128, caller:AccountId) -> Result<(), ErrorSistema> {
-            if let Some(pos) = self.ordenes.iter().position(|x| x.id_orden_compra==id_actual) {
+            
 
-                if let Some(orden_acutal) = self.ordenes.get_mut(pos) {
+            if let Some(orden_acutal) = self.ordenes.get_mut(id_actual as usize) {
 
-                    if let Some(id_anterior) = orden_acutal.solicitud_cancelacion {
-                        if id_anterior == caller {
-                            return Err(ErrorSistema::CancelacionYaSolicitada);
-                        }
-                        else {
-                            if id_anterior == orden_acutal.id_comprador || id_anterior == orden_acutal.id_vendedor{
-
-                                self.ordenes.get_mut(pos).unwrap().estado = EstadoOrdenCompra::Cancelado;
-                                return Ok(())
-                            }
+                if let Some(id_anterior) = orden_acutal.solicitud_cancelacion {
+                    if id_anterior == caller {
+                        return Err(ErrorSistema::CancelacionYaSolicitada);
+                    }
+                    else {
+                        if id_anterior == orden_acutal.id_comprador || id_anterior == orden_acutal.id_vendedor{
+                            self.ordenes.get_mut(id_actual as usize).unwrap().estado = EstadoOrdenCompra::Cancelado;
+                            return Ok(())
                         }
                     }
-                    self.ordenes.get_mut(pos).unwrap().solicitud_cancelacion = Some(caller);
-                    return Ok(())
+                }
+                self.ordenes.get_mut(id_actual as usize).unwrap().solicitud_cancelacion = Some(caller);
+                return Ok(())
                     
-                }
-                else {
-                    return Err(ErrorSistema::IdDeOrdenNoValida);
-                }
             }
             else {
                 return Err(ErrorSistema::IdDeOrdenNoValida);
             }
+            
         }
 
 
@@ -1016,6 +1006,9 @@ mod usuarios_sistema {
             if let Some(user) = sistema.usuarios.get(&bob) {
                 assert!(user.rol == Rol::Ambos);
             }
+
+            // Checkear que el rol no cambia
+            assert!(sistema.agregar_rol(Rol::Vendedor).is_ok());
 
             //-----------------------------------------------------
 
@@ -1243,6 +1236,11 @@ mod usuarios_sistema {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
             sistema.marcar_orden_como_enviada(0); //primero lo marco como enviada
 
+            // Checkeo que el usuario que marco como enviada no pueda marcar como recibida.
+            if let Err(e) = sistema.marcar_orden_como_recibida(0) {
+                assert_eq!(e, ErrorSistema::OperacionNoValida);
+            }
+
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             assert_eq!(sistema.marcar_orden_como_recibida(0), Ok(()));
         }
@@ -1259,6 +1257,9 @@ mod usuarios_sistema {
 
             //Quiero forzar el error de IdDeOrdenNoValida.
             let error_id_invalido = sistema.marcar_orden_como_enviada(0).unwrap_err();
+            assert_eq!(error_id_invalido, ErrorSistema::IdDeOrdenNoValida); //No existe la orden con id 0.
+
+            let error_id_invalido = sistema.marcar_orden_como_recibida(0).unwrap_err();
             assert_eq!(error_id_invalido, ErrorSistema::IdDeOrdenNoValida); //No existe la orden con id 0.
 
             //Creo una orden de compra para que exista una orden con id 0.
@@ -1331,6 +1332,10 @@ mod usuarios_sistema {
             sistema.crear_publicacion(0, 10, 19);
             sistema.crear_publicacion(1, 20, 5);
 
+            sistema.nuevo_producto("Precioalto".to_string(), "Precioalto".to_string(), Categoria::Ropa);
+            let precio_alto = u32::MAX;
+            sistema.crear_publicacion(2, precio_alto, 5);
+
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
@@ -1344,10 +1349,54 @@ mod usuarios_sistema {
                 assert_eq!(e, ErrorSistema::DineroInsuficiente);
             }
 
-            if let Ok(ord) = sistema.generar_orden_compra(lista_compra, 200){
+            if let Ok(ord) = sistema.generar_orden_compra(lista_compra.clone(), 200){
                 assert_eq!(ord.monto, 80);
             }
 
+            if let Err(e) = sistema.generar_orden_compra(vec![(1,1), (2,1)], 200) {
+                assert_eq!(e, ErrorSistema::FueraDeRango);
+            }
+
+            if let Err(e) = sistema.generar_orden_compra(vec![(2,3)], 200) {
+                assert_eq!(e, ErrorSistema::FueraDeRango);
+            }
+
+            lista_compra.push((999,1));
+
+            if let Err(e) = sistema.validar_precio(lista_compra.clone(), 200){
+                assert_eq!(e, ErrorSistema::PublicacionNoValida);
+            }
+
+        }
+
+        #[ink::test]
+        fn test_checked_sums(){
+            let mut sistema = Sistema::new();
+            sistema.proximo_id_producto = u128::MAX;
+            let result = sistema.generar_id_producto();
+            assert_eq!(result.unwrap_err(), ErrorSistema::ProductosLleno);
+
+            sistema.proximo_id_publicacion = u128::MAX;
+            if let Err(e) = sistema.generar_id_publicacion() {
+                assert_eq!(e, ErrorSistema::PublicacionesLleno);
+            }
+
+            sistema.proximo_id_orden = u128::MAX;
+            if let Err(e) = sistema.generar_id_orden() {
+                assert_eq!(e, ErrorSistema::PublicacionesLleno);
+            }
+
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+            sistema.nuevo_producto("Cif".to_string(), "Cif".to_string(), Categoria::Limpieza);
+
+            sistema.crear_publicacion(0, 10, 19);
+
+            if let Some(p) = sistema.publicaciones.get_mut(0) {
+                assert_eq!(p.actualizar_stock(u32::MAX), Err(ErrorSistema::PublicacionesLleno))
+            }
 
         }
     }
