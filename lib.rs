@@ -482,10 +482,8 @@ mod usuarios_sistema {
                 return Err(ErrorSistema::ProductoInvalido);
             }
 
-            let mut usuario = match self.usuarios.get(&usuario_id) {
-                Some(u) => u,
-                None => return Err(ErrorSistema::UsuarioNoExiste),
-            };
+            // Este unwrap se puede realizar sin problema porque la funcion es_vendedor() ya verifica si existe el usuario.
+            let mut usuario = self.usuarios.get(&usuario_id).unwrap();
 
             // Agrego la publicación
             let id_publicacion = self.generar_id_publicacion()?;
