@@ -14,7 +14,6 @@ mod usuarios_sistema {
     /// to add new static storage fields to your contract.
     pub struct Sistema {
         usuarios: ink::storage::Mapping<AccountId, Usuario>,
-        //historial_transacciones: ink::storage::StorageVec<transaccion>, //-> Hay que tener un struct para transaccion???
         publicaciones: Vec<Publicacion>,
         productos: Mapping<u128, Producto>,
         ordenes: Vec<OrdenCompra>,
@@ -65,9 +64,6 @@ mod usuarios_sistema {
         email:String,
         id:AccountId,
         rol: Rol,
-        //productos: Option<Producto>, //Si es vendedor tiene que tener una lista de sus productos.
-        //orden_compra: Option<OrdenDeCompra>, //Si es comprador tiene que tener una orden de compra.
-        //Duda: Tendría que tener un historial de sus propias transacciones?
         publicaciones: Vec<u128>,
 
         // Vector con la posicion en el vector del sistema 
@@ -178,14 +174,6 @@ mod usuarios_sistema {
             Self {  usuarios: Mapping::new(), publicaciones: Vec::<Publicacion>::new(), productos: Mapping::new(), ordenes:Vec::new(), proximo_id_publicacion: 0, proximo_id_producto: 0 , proximo_id_orden: 0}
         }
 
-        /// Constructor that initializes the `bool` value to `false`.
-        ///
-        /// Constructors can delegate to other constructors.
-        /*#[ink(constructor)]
-        pub fn default() -> Self {
-            Self::new()
-        }*/
-
 
         //Verificadores del sistema.
         fn _existe_usuario(&self, id: AccountId) -> Result<bool, ErrorSistema> {
@@ -197,10 +185,8 @@ mod usuarios_sistema {
         }
 
         #[ink(message)]
-        pub fn es_vendedor(&self) -> Result<bool, ErrorSistema> { //Duda: Está bien recibirlo como parámetro al id o lo tengo que obtener del caller?
-            //Duda: Debería preguntar acá o en el privado si el usuario existe?
-
-            let id = self.env().caller(); //Está bien esto? 
+        pub fn es_vendedor(&self) -> Result<bool, ErrorSistema> { 
+            let id = self.env().caller();  
             self._es_vendedor(id)
         }
 
@@ -222,21 +208,6 @@ mod usuarios_sistema {
             }
         }
 
-        //Mismas dudas que en es_vendedor.
-        // Descripción breve de la función
-/// 
-/// Descripción más detallada si es necesaria.
-/// 
-/// # Arguments
-/// 
-/// * `param1` - Descripción del parámetro
-/// * `param2` - Descripción del parámetro
-/// 
-/// # Returns
-/// 
-/// Descripción de lo que retorna
-/// 
-/// # Examples
         #[ink(message)]
         pub fn es_comprador(&self) -> Result<bool, ErrorSistema> { 
             let id = self.env().caller(); 
@@ -272,7 +243,7 @@ mod usuarios_sistema {
         }
 
 
-        //Siempre lo marca como ya registrado (por más de que no lo esté) ????
+        
         fn _registrar_usuario(&mut self, nombre:String, apellido:String, email:String, rol:Rol, id:AccountId) -> Result<(), ErrorSistema>{
             // Chequear que el usuario a registrar no exista en el sistema. (Solo registrar usuarios nuevos)
             if self.usuarios.get(&id).is_some() { //Busca match en el mapping.
@@ -290,7 +261,7 @@ mod usuarios_sistema {
             self._agregar_rol(rol, id)
         }
 
-        fn _agregar_rol(&mut self, rol: Rol, id: AccountId) -> Result<(), ErrorSistema> { //Hacer un agregar para cada rol distinto.
+        fn _agregar_rol(&mut self, rol: Rol, id: AccountId) -> Result<(), ErrorSistema> { 
             // Verifica si el usuario existe.
             if let Some(mut user) = self.usuarios.get(&id) {  
                 user.agregar_rol(rol.clone())?; //Llama a la función del usuario que modifica su rol. (Lo delega)
@@ -413,11 +384,6 @@ mod usuarios_sistema {
 
             // Verifico que por lo menos exista una compra
 
-            // Consulta: si checkeo asi nunca me deja llamar porque siempre cree que el vector esta vacio
-            // if !lista_publicaciones_con_cantidades.len() > 0 {
-            //     return Err(ErrorSistema::CompraSinItems);
-            // }
-
             // Busco el id del vendedor
             let vendedor_actual:AccountId;
             if let Some(publi) = self.publicaciones.iter().find(|x|x.id_publicacion == lista_publicaciones_con_cantidades[0].0) {
@@ -448,11 +414,6 @@ mod usuarios_sistema {
             // Creo la orden
 
             let orden = OrdenCompra{id_comprador:caller, lista_productos:lista_compra, id_orden_compra:id_orden, estado:EstadoOrdenCompra::Pendiente, id_vendedor:vendedor_actual, solicitud_cancelacion:None};
-
-
-            // Por ahora solo estoy agregando la orden a el vector global de ordenes, no se si cada usuario deberia tener su propio vec de ordenes.
-            // si los tuviera, como funciona? Por la orden es una sola entonces solo deberiamos guardar la referencia?
-
             
             // Agrego la orden al vector de ordenes
             self.ordenes.push(orden.clone());
