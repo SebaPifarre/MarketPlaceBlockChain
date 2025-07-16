@@ -14,7 +14,6 @@ mod usuarios_sistema {
     /// to add new static storage fields to your contract.
     pub struct Sistema {
         usuarios: ink::storage::Mapping<AccountId, Usuario>,
-        //historial_transacciones: ink::storage::StorageVec<transaccion>, //-> Hay que tener un struct para transaccion???
         publicaciones: Vec<Publicacion>,
         productos: Mapping<u128, Producto>,
         ordenes: Vec<OrdenCompra>,
@@ -67,9 +66,6 @@ mod usuarios_sistema {
         email:String,
         id:AccountId,
         rol: Rol,
-        //productos: Option<Producto>, //Si es vendedor tiene que tener una lista de sus productos.
-        //orden_compra: Option<OrdenDeCompra>, //Si es comprador tiene que tener una orden de compra.
-        //Duda: Tendría que tener un historial de sus propias transacciones?
         publicaciones: Vec<u128>,
 
         // Vector con la posicion en el vector del sistema 
@@ -180,14 +176,6 @@ mod usuarios_sistema {
             Self {  usuarios: Mapping::new(), publicaciones: Vec::<Publicacion>::new(), productos: Mapping::new(), ordenes:Vec::new(), proximo_id_publicacion: 0, proximo_id_producto: 0 , proximo_id_orden: 0}
         }
 
-        /// Constructor that initializes the `bool` value to `false`.
-        ///
-        /// Constructors can delegate to other constructors.
-        /*#[ink(constructor)]
-        pub fn default() -> Self {
-            Self::new()
-        }*/
-
 
         //Verificadores del sistema.
         fn _existe_usuario(&self, id: AccountId) -> Result<bool, ErrorSistema> {
@@ -199,10 +187,8 @@ mod usuarios_sistema {
         }
 
         #[ink(message)]
-        pub fn es_vendedor(&self) -> Result<bool, ErrorSistema> { //Duda: Está bien recibirlo como parámetro al id o lo tengo que obtener del caller?
-            //Duda: Debería preguntar acá o en el privado si el usuario existe?
-
-            let id = self.env().caller(); //Está bien esto? 
+        pub fn es_vendedor(&self) -> Result<bool, ErrorSistema> { 
+            let id = self.env().caller();  
             self._es_vendedor(id)
         }
 
@@ -224,7 +210,6 @@ mod usuarios_sistema {
             }
         }
 
-        //Mismas dudas que en es_vendedor.
         #[ink(message)]
         pub fn es_comprador(&self) -> Result<bool, ErrorSistema> { 
             let id = self.env().caller(); 
@@ -260,7 +245,7 @@ mod usuarios_sistema {
         }
 
 
-        //Siempre lo marca como ya registrado (por más de que no lo esté) ????
+        
         fn _registrar_usuario(&mut self, nombre:String, apellido:String, email:String, rol:Rol, id:AccountId) -> Result<(), ErrorSistema>{
             // Chequear que el usuario a registrar no exista en el sistema. (Solo registrar usuarios nuevos)
             if self.usuarios.get(&id).is_some() { //Busca match en el mapping.
@@ -278,7 +263,7 @@ mod usuarios_sistema {
             self._agregar_rol(rol, id)
         }
 
-        fn _agregar_rol(&mut self, rol: Rol, id: AccountId) -> Result<(), ErrorSistema> { //Hacer un agregar para cada rol distinto.
+        fn _agregar_rol(&mut self, rol: Rol, id: AccountId) -> Result<(), ErrorSistema> { 
             // Verifica si el usuario existe.
             if let Some(mut user) = self.usuarios.get(&id) {  
                 user.agregar_rol(rol.clone())?; //Llama a la función del usuario que modifica su rol. (Lo delega)
@@ -399,6 +384,7 @@ mod usuarios_sistema {
             
             self.es_vendedor()?;
 
+            // Verifico que por lo menos exista una compra
 
             // Busco el id del vendedor
             let vendedor_actual:AccountId;
@@ -431,12 +417,7 @@ mod usuarios_sistema {
 
             // Creo la orden
 
-            let orden = OrdenCompra{id_comprador:caller, lista_productos:lista_compra, id_orden_compra:id_orden, estado:EstadoOrdenCompra::Pendiente, id_vendedor:vendedor_actual, solicitud_cancelacion:None, monto:monto_total};
-
-
-            // Por ahora solo estoy agregando la orden a el vector global de ordenes, no se si cada usuario deberia tener su propio vec de ordenes.
-            // si los tuviera, como funciona? Por la orden es una sola entonces solo deberiamos guardar la referencia?
-
+            let orden = OrdenCompra{id_comprador:caller, lista_productos:lista_compra, id_orden_compra:id_orden, estado:EstadoOrdenCompra::Pendiente, id_vendedor:vendedor_actual, solicitud_cancelacion:None};
             
             // Agrego la orden al vector de ordenes
             self.ordenes.push(orden.clone());
@@ -669,18 +650,14 @@ mod usuarios_sistema {
     }
 
     impl Usuario {
-        //registrarse. ?? Acá sí que no me quedó clara la parte de delegar.
-        //pub fn crear_publicación
-        //pub fn agregar_a_orden_compra
-        
-        pub fn agregar_rol(&mut self, rol: Rol) -> Result<(), ErrorSistema> { //Hacer un agregar para cada rol distinto..
+        pub fn agregar_rol(&mut self, rol: Rol) -> Result<(), ErrorSistema> { 
             if self.rol == rol {
                 return Err(ErrorSistema::RolYaEnUso);
             }
             // Agrega el nuevo rol al usuario.
             self.rol = match (self.rol.clone(), rol.clone()) {
                 (Rol::Comprador, Rol::Vendedor) | (Rol::Vendedor, Rol::Comprador) => Rol::Ambos,
-                _ => rol, //está de más?
+                _ => rol,
             };
             Ok(())
         }
@@ -885,10 +862,6 @@ mod usuarios_sistema {
 
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
 
-            // if let Err(e) = sistema.marcar_orden_como_enviada(0) {
-            //     assert_eq!(e, ErrorSistema::OperacionNoValida);
-            // }
-
             assert!(sistema.marcar_orden_como_enviada(0).is_ok());
             if let Some(orden) = sistema.ordenes.get(0){
                 assert_eq!(orden.estado, EstadoOrdenCompra::Enviado);
@@ -1031,6 +1004,12 @@ mod usuarios_sistema {
             let error_operacion_no_valida = sistema.marcar_orden_como_enviada(0).unwrap_err();
             assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //El caller no es el vendedor de la orden.
 
+            //Quiero forzar el error de OperacionNoValida porque la orden ya fue enviada.
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            assert!(sistema.marcar_orden_como_enviada(0).is_ok()); //Primero lo marco como enviada.
+            let error_operacion_no_valida = sistema.marcar_orden_como_enviada(0).unwrap_err();
+            assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //La orden ya fue enviada.
+
         }
 
         #[ink::test]
@@ -1083,6 +1062,15 @@ mod usuarios_sistema {
             //Quiero forzar el error de OperacionNoValida.
             let error_operacion_no_valida = sistema.marcar_orden_como_recibida(0).unwrap_err();
             assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //El caller no es el vendedor de la orden.
+
+            //Quiero forzar el error de OperacionNoValida porque la orden ya fue recibida.
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.marcar_orden_como_enviada(0); //Primero lo marco como enviada.
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            assert!(sistema.marcar_orden_como_recibida(0).is_ok()); //Primero lo marco como recibida.
+            let error_operacion_no_valida = sistema.marcar_orden_como_recibida(0).unwrap_err();
+            assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //La orden ya fue recibida.
+            
 
         }
         
