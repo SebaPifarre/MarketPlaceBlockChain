@@ -949,14 +949,14 @@ mod usuarios_sistema {
             sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
 
             //Quiero forzar el error de publicacionNoValida
-            let error_publicacion_invalida = sistema.generar_orden_compra(vec![(0, 1)]).unwrap_err();
+            let error_publicacion_invalida = sistema.generar_orden_compra(vec![(0, 1)],1).unwrap_err();
             assert_eq!(error_publicacion_invalida, ErrorSistema::PublicacionNoValida); //Ok
 
             //Quiero forzar el error de NoPuedeComprarPublicacionPropia
             sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
             sistema.crear_publicacion(0, 1000, 4);
 
-            let error_no_puede_comprar_publicacion_propia = sistema.generar_orden_compra(vec![(0, 1)]).unwrap_err();
+            let error_no_puede_comprar_publicacion_propia = sistema.generar_orden_compra(vec![(0, 1)],4000).unwrap_err();
             assert_eq!(error_no_puede_comprar_publicacion_propia, ErrorSistema::NoPuedeComprarPublicacionPropia); //Ok.
         }
 
@@ -1025,7 +1025,7 @@ mod usuarios_sistema {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
             let lista_compra = vec![(0, 1)];
-            assert!(sistema.generar_orden_compra(lista_compra).is_ok());
+            assert!(sistema.generar_orden_compra(lista_compra,4000).is_ok());
 
             //Quiero forzar el error de OperacionNoValida.
             let error_operacion_no_valida = sistema.marcar_orden_como_enviada(0).unwrap_err();
@@ -1048,7 +1048,7 @@ mod usuarios_sistema {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
             let lista_compra = vec![(0, 1)];
-            assert!(sistema.generar_orden_compra(lista_compra).is_ok());
+            assert!(sistema.generar_orden_compra(lista_compra,4000).is_ok());
 
 
             //Quiero marcar la orden como recibida.
@@ -1078,7 +1078,7 @@ mod usuarios_sistema {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
             let lista_compra = vec![(0, 1)];
-            assert!(sistema.generar_orden_compra(lista_compra).is_ok());
+            assert!(sistema.generar_orden_compra(lista_compra,4000).is_ok());
 
             //Quiero forzar el error de OperacionNoValida.
             let error_operacion_no_valida = sistema.marcar_orden_como_recibida(0).unwrap_err();
@@ -1115,7 +1115,7 @@ mod usuarios_sistema {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
             let lista_compra = vec![(0, 1)];
-            assert!(sistema.generar_orden_compra(lista_compra).is_ok());
+            assert!(sistema.generar_orden_compra(lista_compra,4000).is_ok());
 
             //Verifico que la orden de compra se haya agregado a las órdenes del usuario Alice.
             let mis_ordenes = sistema.ver_mis_ordenes();
