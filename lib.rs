@@ -68,6 +68,7 @@ mod usuarios_sistema {
         CancelacionYaSolicitada,
         DineroInsuficiente,
         FueraDeRango,
+        OrdenCancelada,
     }
 
     /// # Esta es la estructura de un usuario.
@@ -651,8 +652,8 @@ mod usuarios_sistema {
                         Some(val) => val,
                         None => return Err(ErrorSistema::FueraDeRango),
                     };
-                    match monto_total.checked_add(monto_actual) {
-                        Some(val) => monto_total = val,
+                    monto_total = match monto_total.checked_add(monto_actual) {
+                        Some(val) => val,
                         None => return Err(ErrorSistema::FueraDeRango),
                     }
                 }
@@ -783,14 +784,18 @@ mod usuarios_sistema {
         fn _cancelar_orden(&mut self, id_actual:u128, caller:AccountId) -> Result<(), ErrorSistema> {
             
 
-            if let Some(orden_acutal) = self.ordenes.get_mut(id_actual as usize) {
+            if let Some(orden_actual) = self.ordenes.get_mut(id_actual as usize) {
 
-                if let Some(id_anterior) = orden_acutal.solicitud_cancelacion {
+                if orden_actual.estado == EstadoOrdenCompra::Cancelado {
+                    return Err(ErrorSistema::OrdenCancelada);
+                }
+
+                if let Some(id_anterior) = orden_actual.solicitud_cancelacion {
                     if id_anterior == caller {
                         return Err(ErrorSistema::CancelacionYaSolicitada);
                     }
                     else {
-                        if id_anterior == orden_acutal.id_comprador || id_anterior == orden_acutal.id_vendedor{
+                        if id_anterior == orden_actual.id_comprador || id_anterior == orden_actual.id_vendedor{
                             self.ordenes.get_mut(id_actual as usize).unwrap().estado = EstadoOrdenCompra::Cancelado;
                             return Ok(())
                         }
@@ -1082,6 +1087,12 @@ mod usuarios_sistema {
             if let Some(orden) = sistema.ordenes.get(0) {
                 assert_eq!(orden.estado, EstadoOrdenCompra::Cancelado);
             }
+
+            assert_eq!(sistema.cancelar_orden(0), Err(ErrorSistema::OrdenCancelada));
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+
+            assert_eq!(sistema.cancelar_orden(0), Err(ErrorSistema::OrdenCancelada));
             
         }
 
