@@ -3,7 +3,9 @@
 Primer entrega del grupo 1 del seminario Rust 2025 en virtud [del enunciado del trabajo práctico final](https://gist.github.com/EmaBord/980947ecc7924dd68c985e89c05916c2).
 
 Address: XidV7PdUSfKaxX5V27StDY3MZG4x5TRcCMJaJF783kwsKrc
+
 Code hash: 0xa400a27847949a65619ffb54686c904fcbf0a5b19dd361c5ef7166c4ea5b98cd
+
 Contract hash: 0x6341fa7fc564c9d4ea6081b2d1ddf2aa4b96d13571e0cee6d4b2ce10194d96bc
 
 ## Estructura del contrato
