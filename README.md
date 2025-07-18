@@ -103,7 +103,7 @@ El contrato `Sistema` ofrece las siguientes funcionalidades (mensajes de contrat
 -   **`marcar_orden_como_recibida(id_actual)`**: Marca una orden de compra como "Recibida". Solo accesible para el comprador de la orden.
 -   **`cancelar_orden(id_actual)`**: Permite a un comprador o vendedor solicitar la cancelación de una orden. La orden se cancela si y solo si ambos la solicitan.
 -   **`get_publicaciones()`**: Devuelve una lista de todas las publicaciones activas en el sistema.
--   **`ver_mis_ordenes()`**: Devuelve una lista de las órdenes de compra asociadas al `caller`.ttps://gist.github.com/EmaBord/980947ecc7924dd68c985e89c05916c2
+-   **`ver_mis_ordenes()`**: Devuelve una lista de las órdenes de compra asociadas al `caller`.
 
 ## Ejecución de tests
 Con el comando **`cargo test --lib`**.
