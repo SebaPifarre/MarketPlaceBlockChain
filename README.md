@@ -107,3 +107,6 @@ El contrato `Sistema` ofrece las siguientes funcionalidades (mensajes de contrat
 
 ## Ejecución de tests
 Con el comando **`cargo test --lib`**.
+
+## Compilación del contrato
+Con **`cargo +nightly-2024-05-20 contract build`**.
