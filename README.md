@@ -1,6 +1,6 @@
 # Trabajo Práctico Final – Marketplace Descentralizado tipo MercadoLibre (grupo 1)
 
-Primer entrega del grupo 1 del seminario Rust 2025 en virtud [del enunciado del trabajo práctico final](https://gist.github.com/EmaBord/980947ecc7924dd68c985e89c05916c2).
+Primera entrega del grupo 1 del seminario Rust 2025 en virtud [del enunciado del trabajo práctico final](https://gist.github.com/EmaBord/980947ecc7924dd68c985e89c05916c2).
 
 Address: XidV7PdUSfKaxX5V27StDY3MZG4x5TRcCMJaJF783kwsKrc
 
@@ -15,7 +15,7 @@ Contract hash: 0x6341fa7fc564c9d4ea6081b2d1ddf2aa4b96d13571e0cee6d4b2ce10194d96b
 La estructura principal de almacenamiento del contrato. Contiene todos los datos persistentes del marketplace:
 
 -   `usuarios`: Un mapeo de `AccountId` a `Usuario`, almacenando la información de todos los usuarios registrados.
--   `publicaciones`: Un vector que contiene todas las publicaciones de productos activas en el sistema.
+-   `publicaciones`: Un vector que contiene todas las publicaciones de productos activos en el sistema.
 -   `productos`: Un mapeo de `u128` (ID de producto) a `Producto`, almacenando los detalles de cada producto.
 -   `ordenes`: Un vector con todas las órdenes de compra generadas.
 -   `proximo_id_publicacion`: Contador para generar IDs únicos para nuevas publicaciones.
@@ -50,18 +50,18 @@ Representa un producto que puede ser publicado para la venta.
 -   `descripcion`: Descripción detallada del producto.
 -   `categoria`: Categoría a la que pertenece el producto.
 
-### `Categoria`
+### `Categoría`
 
 Un `enum` que clasifica los productos:
 
 -   `Limpieza`
--   `Tecnologia`
--   `Musica`
+-   `Tecnología`
+-   `Música`
 -   `Ropa`
 -   `Calzado`
 -   `Otros`
 
-### `Publicacion`
+### `Publicación`
 
 Representa un artículo específico puesto a la venta en el marketplace.
 
