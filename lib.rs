@@ -9,7 +9,7 @@ mod usuarios_sistema {
 
     #[ink(storage)]
 
-    /// # Este es la estructura del sistema edl MarketPlace
+    /// # Esta es la estructura del sistema del MarketPlace.
     /// Estructura principal de almacenamiento del contrato marketplace.
     ///
     /// `Sistema` contiene toda la información persistente del contrato, incluyendo usuarios, productos,
@@ -88,18 +88,17 @@ mod usuarios_sistema {
         /// Apellido del Usuario
         apellido:String,
 
-        /// Correo electronico del Usuario
+        /// Correo electrónico del Usuario
         email:String,
 
-        /// Codigo identificador (AccountID) del usuario
+        /// Código identificador (AccountID) del usuario
         id:AccountId,
 
-        /// Ocupacion que tiene el Usuario en la pagina
+        /// Ocupación que tiene el Usuario en la página
         rol: Rol,
 
         //productos: Option<Producto>, //Si es vendedor tiene que tener una lista de sus productos.
         //orden_compra: Option<OrdenDeCompra>, //Si es comprador tiene que tener una orden de compra.
-        //Duda: Tendría que tener un historial de sus propias transacciones?
 
         /// Lista de Publicaciones (Id de publicaciones) que tiene un Usuario ´Vendedor´
         publicaciones: Vec<u128>,
@@ -123,9 +122,9 @@ mod usuarios_sistema {
     }
 
     /// # Esta es la estructura de un Producto.
-    /// Representa un producto en una publicacion de marketplace.
+    /// Representa un producto en una publicación de marketplace.
     /// 
-    /// Contiene el nombre, descripcion y la categoria de este.
+    /// Contiene el nombre, descripción y la categoría de éste.
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
         feature = "std",
@@ -211,7 +210,7 @@ mod usuarios_sistema {
         lista_productos: Vec<(u128, u32)>,
         // El vec lo pense con un vec de tuplas, con el id del producto y la cantidad comprada.
 
-        // Se me ocurre que dentro del usuario podemos tener un vec de ordenes de compra
+        // Se me ocurre que dentro del usuario podemos tener un vec de órdenes de compra
         // y para acceder a una en especifica que se use el id de orden
         id_orden_compra: u128,
 
@@ -287,7 +286,7 @@ mod usuarios_sistema {
             //Si existe el usuario
                 //lo encuentro
                 //y verifico si es vendedor o ambos.
-            //Si no existo -> ErrorSistema::UsuarioNoExiste
+            //Si no existe -> ErrorSistema::UsuarioNoExiste
 
             if (self._existe_usuario(id)).is_err() {
                 return Err(ErrorSistema::UsuarioNoExiste);
@@ -320,7 +319,7 @@ mod usuarios_sistema {
             //Si existe el usuario
                 //lo encuentro
                 //y verifico si es comprador o ambos.
-            //Si no existo -> ErrorSistema::UsuarioNoExiste
+            //Si no existe -> ErrorSistema::UsuarioNoExiste
 
             if (self._existe_usuario(id)).is_err() {
                 return Err(ErrorSistema::UsuarioNoExiste);
@@ -356,7 +355,7 @@ mod usuarios_sistema {
 
         
         fn _registrar_usuario(&mut self, nombre:String, apellido:String, email:String, rol:Rol, id:AccountId) -> Result<(), ErrorSistema>{
-            // Chequear que el usuario a registrar no exista en el sistema. (Solo registrar usuarios nuevos)
+            // Chequear que el usuario a registrar no exista en el sistema. (Sólo registrar usuarios nuevos).
             if self.usuarios.get(&id).is_some() { //Busca match en el mapping.
                 return Err(ErrorSistema::UsuarioYaRegistrado);
             }                
@@ -385,7 +384,7 @@ mod usuarios_sistema {
             // Verifica si el usuario existe.
             if let Some(mut user) = self.usuarios.get(&id) {  
                 user.agregar_rol(rol.clone())?; //Llama a la función del usuario que modifica su rol. (Lo delega)
-                self.usuarios.insert(&id, &user); //Lo guardo modificado en le mapping.
+                self.usuarios.insert(&id, &user); //Lo guardo modificado en el mapping.
                 Ok(())
             } else {
                 Err(ErrorSistema::UsuarioNoExiste)
@@ -393,8 +392,8 @@ mod usuarios_sistema {
         }
 
 
-        /// La funcion se fija si la id de un produto es menor al id proximo del producto a
-        /// cargar, comprobando si esta ya fue cargda o no.
+        /// La función se fija si el id de un produto es menor al id próximo del producto a
+        /// cargar, comprobando si éste ya fue cargdo o no.
         /// Retorna `true` si el proucto existe, o false si no existe.
         ///
         /// # Ejemplo
@@ -535,13 +534,13 @@ mod usuarios_sistema {
         
         // Recibe un vector con las publicaciones y la cantidad de cada una para armar la orden.
         fn _generar_orden_compra(&mut self, lista_publicaciones_con_cantidades:Vec<(u128, u32)> , dinero_disponible:u32, caller:AccountId) -> Result<OrdenCompra, ErrorSistema>{
-            // Checkeo si el usuario que esta tratando de realizar la compra tiene el rol debido
+            // Chequeo si el usuario que está tratando de realizar la compra tiene el rol debido.
             
             self.es_vendedor()?;
 
-            // Verifico que por lo menos exista una compra
+            // Verifico que por lo menos exista una compra.
 
-            // Busco el id del vendedor
+            // Busco el id del vendedor.
             let vendedor_actual:AccountId;
             if let Some(publi) = self.publicaciones.iter().find(|x|x.id_publicacion == lista_publicaciones_con_cantidades[0].0) {
                 vendedor_actual = publi.id_publicador;
@@ -550,7 +549,7 @@ mod usuarios_sistema {
                 return Err(ErrorSistema::PublicacionNoValida)
             }
 
-            //Si el usuario que creo la publicacion trata de realizar una compra hay error
+            //Si el usuario que creó la publicación trata de realizar una compra hay error.
 
             if vendedor_actual == caller {
                 return Err(ErrorSistema::NoPuedeComprarPublicacionPropia);
@@ -562,7 +561,7 @@ mod usuarios_sistema {
             let monto_total = self.validar_precio(lista_publicaciones_con_cantidades.clone(), dinero_disponible)?;
 
 
-            // Una vez pasadas todas las validaciones, actualizo el stock
+            // Una vez pasadas todas las validaciones, actualizo el stock.
 
             let lista_compra = self.actualizar_stock_de_orden(lista_publicaciones_con_cantidades);
 
@@ -570,7 +569,7 @@ mod usuarios_sistema {
             let id_orden = self.generar_id_orden()?;
             
 
-            // Creo la orden
+            // Creo la orden.
 
             let orden = OrdenCompra {
                 id_comprador: caller,
@@ -582,10 +581,10 @@ mod usuarios_sistema {
                 monto: monto_total,
             };
             
-            // Agrego la orden al vector de ordenes
+            // Agrego la orden al vector de órdenes.
             self.ordenes.push(orden.clone());
         
-            // Agrego al vector de ambos usuarios
+            // Agrego al vector de ambos usuarios.
             self.agregar_orden_usuario(caller, id_orden)?;
             self.agregar_orden_usuario(vendedor_actual, id_orden)?;
 
@@ -607,30 +606,30 @@ mod usuarios_sistema {
         }
 
         fn validar_orden(&self, lista_publicaciones_con_cantidades:Vec<(u128, u32)>, vendedor_actual:AccountId)->Result<(), ErrorSistema>{
-            // Itero sobre la lista de publicaciones con cantidades y voy checkeando si la compra es valida(id de publicaciones valida y cant valida)
+            // Itero sobre la lista de publicaciones con cantidades y voy chequeando si la compra es válida(id de publicaciones válida y cant válida).
 
             let mut vistos = BTreeSet::new();
             
             for (id_publicacion_actual, cant_productos) in lista_publicaciones_con_cantidades {
 
-                //Check de que no compre dos veces de la misma publicacion
+                //Check de que no compre dos veces de la misma publicación
                 if !vistos.insert(id_publicacion_actual) {
                     return Err(ErrorSistema::PublicacionRepetida)
                 }
 
-                // Check que se trate de comprar aunque sea un item de la publicacion
+                // Check que se trate de comprar aunque sea un item de la publicación.
                 if cant_productos==0 {
                     return Err(ErrorSistema::NoPuedeComprarCero)
                 }
 
                 if let Some(publicacion_actual) = self.publicaciones.iter().find(|x| x.id_publicacion == id_publicacion_actual){
 
-                    // Veo que todas las publicaciones sean del mismo vendedor
+                    // Veo que todas las publicaciones sean del mismo vendedor.
                     if publicacion_actual.id_publicador != vendedor_actual {
                         return Err(ErrorSistema::VendedorDistinto)
                     }
 
-                    // Veo que la publicacion tengo el stock necesario para la compra
+                    // Veo que la publicación tenga el stock necesario para la compra.
                     if !publicacion_actual.tiene_stock_suficiente(cant_productos) {
                         return Err(ErrorSistema::StockInsuficiente)
                     }
