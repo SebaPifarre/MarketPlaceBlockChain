@@ -905,7 +905,7 @@ mod usuarios_sistema {
 
     impl Usuario {
         pub fn agregar_rol(&mut self, rol: Rol) -> Result<(), ErrorSistema> { 
-            if self.rol == rol {
+            if self.rol == rol || self.rol == Rol::Ambos{
                 return Err(ErrorSistema::RolYaEnUso);
             }
             // Agrega el nuevo rol al usuario.
@@ -1162,6 +1162,28 @@ mod usuarios_sistema {
             //Pruebo con un usuario (eve) que no esté en el sistema.
             let error = sistema.agregar_rol(Rol::Vendedor).unwrap_err();
             assert_eq!(error, ErrorSistema::UsuarioNoExiste);
+        }
+
+        #[ink::test]
+        /*TEST PARA EL FIX DE ESTA CORRECCIÓN: 
+        Existe una falla en la lógica que hace posible eliminarse roles al usar la función agregarRol() 
+        teniendo ya el rol de Ambos. Permitiendo, por ejemplo, cambiar del rol Comprador a Ambos,
+         para posteriormente pasar a tener únicamente el rol Vendedor.  */
+        fn agregar_rol_desde_ambos() {
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+
+            let mut sistema = Sistema::new();
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            // Agrego el rol de Comprador, debería seguir siendo Ambos.
+            assert!(sistema.agregar_rol(Rol::Comprador).is_err());
+            let error = sistema.agregar_rol(Rol::Comprador).unwrap_err();
+            assert_eq!(error, ErrorSistema::RolYaEnUso);
+
+            if let Some(user) = sistema.usuarios.get(&charlie) {
+                assert!(user.rol == Rol::Ambos);
+            }
         }
 
         //-------------------------------------------------------------------------------------
