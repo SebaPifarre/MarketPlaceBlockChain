@@ -427,6 +427,11 @@ mod usuarios_sistema {
         /// ```
         #[ink(message)]
         pub fn nuevo_producto(&mut self, nombre: String, descripcion: String, categoria: Categoria) -> Result<u128, ErrorSistema> {
+            //El usuario que genera el producto debe existir en el sistema, y ser vendedor.
+            if let Err(e) = self._existe_usuario(self.env().caller()) {
+                return Err(e);
+            }
+
             if let Ok(false) = self.es_vendedor() {
                 return Err(ErrorSistema::UsuarioNoEsVendedor);
             }
@@ -901,6 +906,17 @@ mod usuarios_sistema {
             let mut sistema = Sistema::new();
 
             assert!(sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Comprador).is_ok());
+        }
+
+        #[ink::test]
+        fn nuevo_producto_usuario_inexistente() {
+            //Se testea que un usuario que no existe en la plataforma no pueda crear un producto.
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            let mut sistema = Sistema::new();
+
+            assert!(sistema.nuevo_producto(String::from("Laptop"), String::from("Laptop gamer"), Categoria::Tecnologia).is_err());
+            // El usuario no existe, por lo tanto no puede crear un producto.
         }
 
         /// We test that we cannot register a user that already exists.
