@@ -829,6 +829,45 @@ mod usuarios_sistema {
             self.publicaciones.clone()
         }
 
+        /// Devuelve la lista de todas las publicaciones existentes en el sistema del vendedor que la llama.
+        ///
+        /// # Ejemplo
+        /// ```
+        ///      AGREGAR!!!! 
+        /// ```
+        #[ink(message)]
+        pub fn get_publicaciones_propias(&self)-> Result<Vec<Publicacion>, ErrorSistema>{
+            let caller = self.env().caller();
+            self._get_publicaciones_propias(caller)
+        }
+
+        fn _get_publicaciones_propias(&self, caller:AccountId)-> Result<Vec<Publicacion>, ErrorSistema> {
+            let mut publicaciones_propias: std::vec::Vec<Publicacion> = Vec::new();
+            // Verifico si el usuario existe.
+
+            if let Err(e) = self._existe_usuario(caller) {
+                return Err(ErrorSistema::UsuarioNoExiste); // Si no existe, retorno un vector vacío.
+            } else {
+                if !self.es_vendedor().unwrap_or(false) {
+                    return Err(ErrorSistema::UsuarioNoEsVendedor); // Si no es vendedor, retorno un vector vacío.
+                }
+            }
+
+            // Si el usuario existe y es vendedor, busco sus publicaciones.
+            // Itero sobre las publicaciones del usuario y las agrego al vector de publicaciones propias.
+            // Si el usuario no tiene publicaciones, el vector quedará vacío.
+            let mut publicaciones_propias = Vec::new();
+            for publicacion in self.publicaciones.iter() {
+                if publicacion.id_publicador == caller {
+                    publicaciones_propias.push(publicacion.clone());
+                }
+            }
+
+            Ok(publicaciones_propias)
+        }
+
+
+
 
 
         /// Devuelve la lista de órdenes asociadas al usuario que llama.
@@ -1238,6 +1277,64 @@ mod usuarios_sistema {
             let error_operacion_no_valida = sistema.marcar_orden_como_enviada(0).unwrap_err();
             assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //La orden ya fue enviada.
 
+        }
+
+        #[ink::test]
+        //Test que verifica que get publicaciones_propias funcione (con un caso en el que sí funciona).
+        fn get_publicaciones_propias_okay() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
+
+            sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
+            sistema.crear_publicacion(0, 1000, 4); //La publicación la crea Charlie.
+
+            //Verifico que el usuario pueda obtener sus publicaciones.
+            assert!(sistema.get_publicaciones_propias().is_ok());
+
+            //Chequeo el estado posterior del sistema.
+            assert_eq!(sistema.get_publicaciones().len(), 1);
+        }
+
+        #[ink::test]
+        //Test que verifica que get publicaciones_propias funcione (con un caso en el que el usuario es existe, es vendedor y no tiene publicaciones).
+        fn get_publicaciones_propias_vacio_okay() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
+
+            //Verifico que el usuario pueda obtener sus publicaciones (debe devolver un vector vacío).
+            let publicaciones_propias = sistema.get_publicaciones_propias().unwrap();
+            assert!(publicaciones_propias.is_empty());
+
+            //Chequeo el estado posterior del sistema.
+            assert_eq!(sistema.get_publicaciones().len(), 0);
+        }
+
+        #[ink::test]
+        //Test que verifica que get publicaciones_propias 'no funcione' (con un caso en el que el usuario no existe en el sistema).
+        fn get_publicaciones_propias_usuario_no_existe() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            //No registro a charlie en el sistema.
+
+            let error_usuario_no_existe = sistema.get_publicaciones_propias().unwrap_err();
+            assert_eq!(error_usuario_no_existe, ErrorSistema::UsuarioNoExiste); //El usuario no existe.
+        }
+
+        #[ink::test]
+        //Test que verifica que get publicaciones_propias 'no funcione' (con un caso en el que el usuario no es vendedor).
+        fn get_publicaciones_propias_usuario_no_vendedor() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Comprador);
+
+            let error_usuario_no_es_vendedor = sistema.get_publicaciones_propias().unwrap_err();
+            assert_eq!(error_usuario_no_es_vendedor, ErrorSistema::UsuarioNoEsVendedor); //El usuario no es vendedor.
         }
 
         #[ink::test]
