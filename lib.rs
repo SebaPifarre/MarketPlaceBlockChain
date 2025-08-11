@@ -842,7 +842,7 @@ mod usuarios_sistema {
         }
 
         fn _get_publicaciones_propias(&self, caller:AccountId)-> Result<Vec<Publicacion>, ErrorSistema> {
-            let mut publicaciones_propias: std::vec::Vec<Publicacion> = Vec::new();
+            let mut publicaciones_propias = Vec::<Publicacion>::new();
             // Verifico si el usuario existe.
 
             if let Err(e) = self._existe_usuario(caller) {
