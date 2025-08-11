@@ -945,13 +945,33 @@ mod usuarios_sistema {
         /// We test that we can register a user.
         /// In this test the user is added successfully.
         #[ink::test]
-        fn registrar_usuario_okay() {
+        fn registrar_usuario_comprador_okay() {
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
 
             let mut sistema = Sistema::new();
 
             assert!(sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Comprador).is_ok());
+        }
+
+        #[ink::test]
+        fn registrar_usuario_vendedor_okay() {
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+
+            let mut sistema = Sistema::new();
+
+            assert!(sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Vendedor).is_ok());
+        }
+
+        #[ink::test]
+        fn registrar_usuario_ambos_okay() {
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+
+            let mut sistema = Sistema::new();
+
+            assert!(sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos).is_ok());
         }
 
         #[ink::test]
