@@ -544,6 +544,9 @@ mod usuarios_sistema {
             self.es_vendedor()?;
 
             // Verifico que por lo menos exista una compra.
+            if lista_publicaciones_con_cantidades.is_empty() {
+                return Err(ErrorSistema::CompraSinItems);
+            }
 
             // Busco el id del vendedor.
             let vendedor_actual:AccountId;
@@ -1036,6 +1039,20 @@ mod usuarios_sistema {
             //Pruebo con un usuario (bob) que no esté en el sistema.
             assert!(sistema.es_comprador().is_err());
         }
+
+        #[ink::test]
+        fn generar_orden_compra_sin_items() {
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+
+            let mut sistema = Sistema::new();
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Comprador);
+
+            //Pruebo generar una orden de compra sin items.
+            let error = sistema.generar_orden_compra(Vec::<(u128, u32)>::new(), 100).unwrap_err();
+            assert_eq!(error, ErrorSistema::CompraSinItems);
+        }
+
 
         #[ink::test]
         fn test_agregar_rol() {
