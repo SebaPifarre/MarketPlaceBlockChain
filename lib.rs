@@ -956,6 +956,10 @@ mod usuarios_sistema {
             let mut sistema = Sistema::new();
 
             assert!(sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Comprador).is_ok());
+
+            //Chequeamos que el usuario se haya registrado correctamente.
+            let usuario = sistema.usuarios.get(&alice);
+            assert!(usuario.is_some());
         }
 
         #[ink::test]
@@ -966,6 +970,10 @@ mod usuarios_sistema {
             let mut sistema = Sistema::new();
 
             assert!(sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Vendedor).is_ok());
+
+            //Chequeamos que el usuario se haya registrado correctamente.
+            let usuario = sistema.usuarios.get(&alice);
+            assert!(usuario.is_some());
         }
 
         #[ink::test]
@@ -976,18 +984,25 @@ mod usuarios_sistema {
             let mut sistema = Sistema::new();
 
             assert!(sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos).is_ok());
+
+            //Chequeamos que el usuario se haya registrado correctamente.
+            let usuario = sistema.usuarios.get(&alice);
+            assert!(usuario.is_some());
         }
 
          /// We test that we cannot register a user that already exists.
          #[ink::test]
          fn registrar_usuario_not_okay() {
-             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
-             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
  
-             let mut sistema = Sistema::new();
-             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Comprador);
+            let mut sistema = Sistema::new();
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Comprador);
  
-             assert!(sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Comprador).is_err());
+            assert!(sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Comprador).is_err());
+
+            //Chequeamos que el usuario no se haya registrado nuevamente.
+            assert!(sistema.usuarios.get(&alice).is_some());
          }
 
         //-------------------------------------------------------------------------------------
@@ -1002,6 +1017,9 @@ mod usuarios_sistema {
 
             assert!(sistema.nuevo_producto(String::from("Laptop"), String::from("Laptop gamer"), Categoria::Tecnologia).is_err());
             // El usuario no existe, por lo tanto no puede crear un producto.
+
+            //Chequear el estado posterior del sistema (no debería haber ningún producto).
+            assert!(sistema.productos.get(0).is_none());
         }
 
         #[ink::test]
@@ -1012,7 +1030,11 @@ mod usuarios_sistema {
             sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Comprador);
 
             let error = sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros).unwrap_err();
-            assert_eq!(error, ErrorSistema::UsuarioNoEsVendedor);
+            assert_eq!(error, ErrorSistema::UsuarioNoEsVendedor);//Chequear el estado posterior del sistema (no debería haber ningún producto).
+            assert!(sistema.productos.get(0).is_none());
+
+            //Chequear el estado posterior del sistema (no debería haber ningún producto).
+            assert!(sistema.productos.get(0).is_none());
         }
 
        //-------------------------------------------------------------------------------------
@@ -1027,13 +1049,21 @@ mod usuarios_sistema {
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Comprador);
 
             assert!(sistema._existe_usuario(alice).is_ok());
+        }
+
+        #[ink::test]
+        fn test_no_existe_usuaro() {
+            let mut sistema = Sistema::new();
 
             let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
+
+            //Pruebo con un usuario (bob) que no esté en el sistema.
             assert!(sistema._existe_usuario(bob).is_err());
         }
 
         #[ink::test]
+        //Registro un usuario en el sistema, que es vendedor y verifico que exista (con ese rol).
         fn test_es_vendedor() {
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
@@ -1043,6 +1073,12 @@ mod usuarios_sistema {
 
             //Pruebo con un usuario (alice) que esté en el sistema y sea vendedor.
             assert!(matches!(sistema.es_vendedor(), Ok(true)));
+        }
+
+        #[ink::test]
+        //Registro un usuario en el sistema, que no es vendedor y verifico exista sin ese rol (que el modulo es_vendedor retorne falso).
+        fn test_no_es_vendedor() {
+            let mut sistema = Sistema::new();
 
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
@@ -1050,8 +1086,13 @@ mod usuarios_sistema {
 
             //Pruebo con un usuario (charlie) que esté en el sistema pero no sea vendedor.
             assert!(matches!(sistema.es_vendedor(), Ok(false)));
+        }
 
-
+        #[ink::test]
+        //No registro a un usuario en el sistema, y verifico que no exista (que el modulo es_vendedor retorne error).
+        fn test_es_vendedor_usuario_inexistente() {
+            let mut sistema = Sistema::new(); 
+            
             let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
 
@@ -1059,7 +1100,9 @@ mod usuarios_sistema {
             assert!(sistema.es_vendedor().is_err());
         }
 
+
         #[ink::test]
+        //Registro un usuario en el sistema, que es comprador y verifico que exista (con ese rol).
         fn test_es_comprador() {
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
@@ -1069,6 +1112,24 @@ mod usuarios_sistema {
 
             //Pruebo con un usuario (alice) que esté en el sistema y sea comprador.
             assert!(matches!(sistema.es_comprador(), Ok(true)));
+        }
+
+        #[ink::test]
+        //No registro a un usuario en el sistema, y verifico que no exista (que el modulo es_comprador retorne error).
+        fn test_es_comprador_usuario_inexistente() {
+            let mut sistema = Sistema::new(); 
+
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
+
+            //Pruebo con un usuario (bob) que no esté en el sistema.
+            assert!(sistema.es_comprador().is_err());
+        }
+
+        #[ink::test]
+        //Registro un usuario en el sistema, que no es comprador y verifico exista sin ese rol (que el modulo es_comprador retorne falso).
+        fn test_no_es_comprador() {
+            let mut sistema = Sistema::new();
 
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
@@ -1076,13 +1137,6 @@ mod usuarios_sistema {
 
             //Pruebo con un usuario (charlie) que esté en el sistema pero no sea vendedor.
             assert!(matches!(sistema.es_comprador(), Ok(false)));
-
-
-            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
-
-            //Pruebo con un usuario (bob) que no esté en el sistema.
-            assert!(sistema.es_comprador().is_err());
         }
 
         //-------------------------------------------------------------------------------------
