@@ -1142,6 +1142,7 @@ mod usuarios_sistema {
         //-------------------------------------------------------------------------------------
         //TESTS AGREGAR_ROL:
         #[ink::test]
+        //Se testea que se pueda agregar el rol de vendedor a un usuario que es comprador.
         fn test_agregar_roles_a_vendedor() {
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
@@ -1157,8 +1158,8 @@ mod usuarios_sistema {
             }
         }
         #[ink::test]
+        //Se testea que se pueda agregar el rol de comprador a un usuario que es vendedor.
         fn test_agregar_roles_a_comprador() {
-
             //Inicializa bob como vendedor.
             let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
@@ -1171,12 +1172,10 @@ mod usuarios_sistema {
             if let Some(user) = sistema.usuarios.get(&bob) {
                 assert!(user.rol == Rol::Ambos);
             }
-
-            // Checkear que el rol no cambia
-            assert!(sistema.agregar_rol(Rol::Vendedor).is_ok());
         }
 
         #[ink::test]
+        //Se testea que se pueda agregar el rol de ambos a un usuario que es vendedor.
         fn test_agregar_roles_a_ambos() {
             //Inicializa bob como vendedor.
             let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
@@ -1193,6 +1192,7 @@ mod usuarios_sistema {
         }
         
         #[ink::test]
+        //Se testea que no se pueda agregar un rol que ya tiene el usuario.
         fn test_agregar_roles_no_okay() {
             //Inicializa charlie como vendedor.
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
@@ -1201,13 +1201,13 @@ mod usuarios_sistema {
             let mut sistema = Sistema::new();
             sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
 
-            //Ya tiene el rol de vendedor. Por lo qe no se puede agregar el rol de vendedor otra vez.
+            //Ya tiene el rol de vendedor. Por lo que no se puede agregar el rol de vendedor otra vez.
             let error = sistema.agregar_rol(Rol::Vendedor).unwrap_err();
             assert_eq!(error, ErrorSistema::RolYaEnUso);
-
         }
 
         #[ink::test]
+        //Se testea que no se pueda agregar un rol a un usuario que no existe en el sistema.
         fn test_agregar_roles_usuario_inexistente() {
             let mut sistema = Sistema::new();
             let eve = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().eve;
