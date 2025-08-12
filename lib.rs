@@ -1481,7 +1481,7 @@ mod usuarios_sistema {
         //TEST ESTADOS DE ORDEN
   
         #[ink::test]
-        //Este test es para ver si salta el error (operación no válida) al tratar de cancelar una orden ya recibida.
+        //Este test es para ver si salta el error (operación no válida) al tratar de cancelar una orden ya recibida (ya que es algo que no se puede hacer).
         fn cancelar_orden_ya_recibida() {
             //Genero una orden de compra
             let mut sistema = Sistema::new();
@@ -1489,22 +1489,21 @@ mod usuarios_sistema {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
             sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
 
+            //Creo el producto.
             if let Ok(id) = sistema.nuevo_producto("banana".to_string(), "una banana".to_string(), Categoria::Limpieza){
                 assert_eq!(id, 0);
             }
 
+            //Creo la publicación.
             sistema.crear_publicacion(0, 10, 19);
 
             let mut lista_compra = Vec::new();
             lista_compra.push((0,2));
 
+            //Preparo al otro usuario para que compre de esa publicación. (Ya que no se puede generar una orden de compra a partir de una publicación propia).
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
-
-            if let Err(e) = sistema.generar_orden_compra(lista_compra.clone(), 1) {
-                assert_eq!(e, ErrorSistema::DineroInsuficiente);
-            }
             
             assert!(sistema.generar_orden_compra(lista_compra, 200).is_ok());
 
@@ -1520,19 +1519,26 @@ mod usuarios_sistema {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             assert!(sistema.marcar_orden_como_recibida(0).is_ok());
 
-            //Trato de cancelar la orden (esto debería fallar).
+            //Trato de cancelar la orden (desde Alice) (esto debería fallar).
             let error = sistema.cancelar_orden(0).unwrap_err();
             assert_eq!(error, ErrorSistema::OperacionNoValida);
 
 
-            //Trato también desde Charlie.
+            //Trato de cancelar la orden también desde Charlie.
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
             let error = sistema.cancelar_orden(0).unwrap_err();
             assert_eq!(error, ErrorSistema::OperacionNoValida);
+
+
+            //Chequeo estado del sistema posteriormente (ver si no se modificó el estado de la orden).
+            if let Some(orden) = sistema.ordenes.get(0){
+                assert_eq!(orden.estado, EstadoOrdenCompra::Recibido);
+            }
         }
 
         #[ink::test]
-        fn test_marcar_orden_como_enviada_errores() {
+        //Test que verifica que no se puede marcar la orden como enviada si el id de la misma es inválido.
+        fn test_marcar_orden_como_enviada_id_invalido() {
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
@@ -1545,26 +1551,78 @@ mod usuarios_sistema {
             let error_id_invalido = sistema.marcar_orden_como_enviada(0).unwrap_err();
             assert_eq!(error_id_invalido, ErrorSistema::IdDeOrdenNoValida); //No existe la orden con id 0.
 
+            //Chequeo estado del sistema posteriormente (ver si no se modificó el estado de la orden).
+            if let Some(orden) = sistema.ordenes.get(0){
+                assert_eq!(orden.estado, EstadoOrdenCompra::Pendiente);
+            }
+        }
+
+        #[ink::test]
+        ///Test que verifica que no se puede marcar una orden como enviada si el caller no es el vendedor de la orden.
+        fn test_marcar_orden_enviada_caller_invalido() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
+            sistema.crear_publicacion(0, 1000, 4); //La publicación la crea Charlie.
+
             //Creo una orden de compra para que exista una orden con id 0.
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
+
             let lista_compra = vec![(0, 1)];
             assert!(sistema.generar_orden_compra(lista_compra,4000).is_ok());
 
             //Quiero forzar el error de OperacionNoValida.
-            let error_operacion_no_valida = sistema.marcar_orden_como_enviada(0).unwrap_err();
+            let error_operacion_no_valida = sistema.marcar_orden_como_enviada(0).unwrap_err(); //La estoy tratando de marcar como enviada desde Alice, pero la orden la creó Charlie.
             assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //El caller no es el vendedor de la orden.
 
-            //Quiero forzar el error de OperacionNoValida porque la orden ya fue enviada.
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
-            assert!(sistema.marcar_orden_como_enviada(0).is_ok()); //Primero lo marco como enviada.
-            let error_operacion_no_valida = sistema.marcar_orden_como_enviada(0).unwrap_err();
-            assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //La orden ya fue enviada.
-
+            //Chequeo estado del sistema posteriormente (ver si no se modificó el estado de la orden).
+            if let Some(orden) = sistema.ordenes.get(0){
+                assert_eq!(orden.estado, EstadoOrdenCompra::Pendiente);
+            }
         }
 
         #[ink::test]
+        //Test que verifica que no se puede marcar una orden como enviada si la orden ya fue enviada.
+        fn test_marcar_orden_como_enviada_doble() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
+            sistema.crear_publicacion(0, 1000, 4); //La publicación la crea Charlie.
+
+            //Creo una orden de compra para que exista una orden con id 0.
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
+
+            let lista_compra = vec![(0, 1)];
+            assert!(sistema.generar_orden_compra(lista_compra,4000).is_ok());
+
+            //Quiero forzar el error de OperacionNoValida porque la orden ya fue enviada.
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+
+            assert!(sistema.marcar_orden_como_enviada(0).is_ok()); //Primero lo marco como enviada.
+
+            //Trato de enviarlo otra vez.
+            let error_operacion_no_valida = sistema.marcar_orden_como_enviada(0).unwrap_err();
+            assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //La orden ya fue enviada.
+
+            //Chequeo estado del sistema posteriormente (ver si el estado de la orden quedó como enviado).
+            if let Some(orden) = sistema.ordenes.get(0){
+                assert_eq!(orden.estado, EstadoOrdenCompra::Enviado);
+            }
+        }
+
+        #[ink::test]
+        //Test que verifica que se puede marcar una orden como enviada correctamente.
         fn test_marcar_orden_como_recibida() {
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
@@ -1578,6 +1636,8 @@ mod usuarios_sistema {
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
+
+            //Genero la orden de compra.
             let lista_compra = vec![(0, 1)];
             assert!(sistema.generar_orden_compra(lista_compra,4000).is_ok());
 
@@ -1586,13 +1646,52 @@ mod usuarios_sistema {
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
             sistema.marcar_orden_como_enviada(0); //primero lo marco como enviada
 
-            // Checkeo que el usuario que marco como enviada no pueda marcar como recibida.
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            assert_eq!(sistema.marcar_orden_como_recibida(0), Ok(()));
+
+            //Chequeo el estado de la orden. (Estado posterior del sistema).
+            if let Some(orden) = sistema.ordenes.get(0){
+                assert_eq!(orden.estado, EstadoOrdenCompra::Recibido);
+            } else {
+                panic!("La orden no fue encontrada después de marcarla como recibida.");
+            }
+        }
+
+        #[ink::test]
+        //Test que verifica que no se puede marcar una orden como recibida si quien lo hace es el usuario que la creó.
+        fn test_marcar_orden_recibida_mismo_caller() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
+            sistema.crear_publicacion(0, 1000, 4); //La publicación la crea Charlie.
+
+            //Creo una orden de compra para que exista una orden con id 0.
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
+
+            //Genero la orden de compra.
+            let lista_compra = vec![(0, 1)];
+            assert!(sistema.generar_orden_compra(lista_compra,4000).is_ok());
+
+
+            //Quiero marcar la orden como recibida.
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.marcar_orden_como_enviada(0); //primero lo marco como enviada
+
+            //Chequeo que el usuario que marcó como enviada no pueda marcar como recibida. (No cambié el caller).
             if let Err(e) = sistema.marcar_orden_como_recibida(0) {
                 assert_eq!(e, ErrorSistema::OperacionNoValida);
             }
 
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
-            assert_eq!(sistema.marcar_orden_como_recibida(0), Ok(()));
+            //Chequeo el estado de la orden. (Estado posterior del sistema).
+            //La orden no debería haber cambiado su estado.
+            if let Some(orden) = sistema.ordenes.get(0){
+                assert_eq!(orden.estado, EstadoOrdenCompra::Enviado);
+            }
         }
 
         #[ink::test]
@@ -1630,8 +1729,6 @@ mod usuarios_sistema {
             assert!(sistema.marcar_orden_como_recibida(0).is_ok()); //Primero lo marco como recibida.
             let error_operacion_no_valida = sistema.marcar_orden_como_recibida(0).unwrap_err();
             assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //La orden ya fue recibida.
-            
-
         }
         
         #[ink::test]
