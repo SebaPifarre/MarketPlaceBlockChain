@@ -54,6 +54,7 @@ mod usuarios_sistema {
         ProductosLleno,
         // Publicación
         UsuarioNoEsVendedor,
+        UsuarioNoEsComprador,
         ProductoInvalido,
         PublicacionesLleno,
         CompraSinItems,
@@ -541,7 +542,17 @@ mod usuarios_sistema {
         fn _generar_orden_compra(&mut self, lista_publicaciones_con_cantidades:Vec<(u128, u32)> , dinero_disponible:u32, caller:AccountId) -> Result<OrdenCompra, ErrorSistema>{
             // Chequeo si el usuario que está tratando de realizar la compra tiene el rol debido.
             
-            self.es_vendedor()?;
+            //Si no existe el usuario se propaga el error:
+            self.es_comprador()?;
+            // // Verifico que el usuario sea comprador.
+            // Si no es comprador, retorno un error.
+            if let comprador = self.es_comprador()? {
+                if !comprador {
+                    return Err(ErrorSistema::UsuarioNoEsComprador);
+                }
+            }
+
+
 
             // Verifico que por lo menos exista una compra.
             if lista_publicaciones_con_cantidades.is_empty() {
@@ -1220,9 +1231,9 @@ mod usuarios_sistema {
 
         #[ink::test]
         /*TEST PARA EL FIX DE ESTA CORRECCIÓN: 
-        Existe una falla en la lógica que hace posible eliminarse roles al usar la función agregarRol() 
+        "Existe una falla en la lógica que hace posible eliminarse roles al usar la función agregarRol() 
         teniendo ya el rol de Ambos. Permitiendo, por ejemplo, cambiar del rol Comprador a Ambos,
-         para posteriormente pasar a tener únicamente el rol Vendedor.  */
+         para posteriormente pasar a tener únicamente el rol Vendedor."  */
         fn agregar_rol_desde_ambos() {
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
@@ -1242,7 +1253,9 @@ mod usuarios_sistema {
 
         //-------------------------------------------------------------------------------------
         //TESTS ORDEN DE COMPRA:
+
         #[ink::test]
+        //Test para verificar que no se puede generar una orden de compra sin items.
         fn generar_orden_compra_sin_items() {
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
@@ -1256,6 +1269,7 @@ mod usuarios_sistema {
         }
 
         #[ink::test]
+        //Test para verificar que no se puede generar una orden de compra de una publicacion que no existe.
         fn test_generar_orden_compra_error() {
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
@@ -1263,18 +1277,93 @@ mod usuarios_sistema {
             sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
 
             //Quiero forzar el error de publicacionNoValida
+            //No existe la publicación con id 0.
             let error_publicacion_invalida = sistema.generar_orden_compra(vec![(0, 1)],1).unwrap_err();
             assert_eq!(error_publicacion_invalida, ErrorSistema::PublicacionNoValida); //Ok
 
+            //Verifico que no se haya agregado ninguna orden de compra. (Estado posterior del sistema).
+            assert!(sistema.ordenes.is_empty());
+        }
+
+        #[ink::test]
+        //Test para verificar que no se puede generar una orden de compra de una publicación propia.
+        fn test_generar_orden_compra_propia() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
             //Quiero forzar el error de NoPuedeComprarPublicacionPropia
+            //Charlie crea una publicación y luego intenta comprarla.
             sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
             sistema.crear_publicacion(0, 1000, 4);
 
             let error_no_puede_comprar_publicacion_propia = sistema.generar_orden_compra(vec![(0, 1)],4000).unwrap_err();
             assert_eq!(error_no_puede_comprar_publicacion_propia, ErrorSistema::NoPuedeComprarPublicacionPropia); //Ok.
+
+            //Verifico que no se haya agregado ninguna orden de compra. (Estado posterior del sistema).
+            assert!(sistema.ordenes.is_empty());
         }
 
         #[ink::test]
+        //Test para verificar que no se puede generar una orden de compra con dinero insuficiente.
+        fn test_generar_orden_compra_dinero_insuficiente() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
+            sistema.crear_publicacion(0, 1000, 4); //La publicación la crea Charlie.
+
+            //Preparo al otro usuario para que compre de esa publicación. (Ya que no se puede generar una orden de compra a partir de una publicación propia).
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
+            //Alice intenta comprar 1 termo, pero no tiene suficiente dinero (solo tiene 500).
+
+            //Quiero forzar el error de DineroInsuficiente
+            let error_dinero_insuficiente = sistema.generar_orden_compra(vec![(0, 1)], 500).unwrap_err();
+            assert_eq!(error_dinero_insuficiente, ErrorSistema::DineroInsuficiente); //Ok.
+
+            //Verifico que no se haya agregado ninguna orden de compra. (Estado posterior del sistema).
+            assert!(sistema.ordenes.is_empty());
+        }
+
+        #[ink::test]
+        //Test para verificar que un usuario no pueda generar una orden de compra si no es comprador.
+        fn test_orden_compra_no_comprador() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
+
+            //Quiero forzar el error de UsuarioNoEsComprador
+            let error_usuario_no_comprador = sistema.generar_orden_compra(vec![(0, 1)], 1000).unwrap_err();
+            assert_eq!(error_usuario_no_comprador, ErrorSistema::UsuarioNoEsComprador); //Ok.
+
+            //Verifico que no se haya agregado ninguna orden de compra. (Estado posterior del sistema).
+            assert!(sistema.ordenes.is_empty());
+        }
+
+        #[ink::test]
+        //Test para verificar que un usuario no pueda generar una orden de compra si no existe en el sistema.
+        fn test_orden_compra_usuario_inexistente() {
+            let mut sistema = Sistema::new();
+            let eve = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().eve;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(eve);
+
+            //Quiero forzar el error de UsuarioNoExiste
+            let error_usuario_no_existe = sistema.generar_orden_compra(vec![(0, 1)], 1000).unwrap_err();
+            assert_eq!(error_usuario_no_existe, ErrorSistema::UsuarioNoExiste); //Ok.
+
+            //Verifico que no se haya agregado ninguna orden de compra. (Estado posterior del sistema).
+            assert!(sistema.ordenes.is_empty());
+        }
+
+
+        #[ink::test]
+        //Test para verificar que se pueda generar una orden de compra correctamente.
         fn test_ver_mis_ordenes() {
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
@@ -1284,6 +1373,7 @@ mod usuarios_sistema {
             sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
             sistema.crear_publicacion(0, 1000, 4); //La publicación la crea Charlie.
 
+            //Preparo al otro usuario para que compre de esa publicación. (Ya que no se puede generar una orden de compra a partir de una publicación propia).
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
@@ -1304,7 +1394,8 @@ mod usuarios_sistema {
         }
 
         #[ink::test]
-        fn test_validar_orden_errores() {
+        //Test para verificar que no se puede agregar una orden de compra con publicaciones repetidas (no pasa la validación).
+        fn test_validar_orden_publicacion_repetida() {
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
@@ -1316,25 +1407,70 @@ mod usuarios_sistema {
             //Quiero forzar el error de PublicacionRepetida.
             let error_publicacion_repetida = sistema.validar_orden(vec![(0, 1), (0, 2)], charlie).unwrap_err(); 
             assert_eq!(error_publicacion_repetida, ErrorSistema::PublicacionRepetida); 
+        }
+
+        #[ink::test]
+        //Test para verificar que no se puede generar una orden de compra con cantidad cero (no pasa la validación).
+        fn test_validar_orden_comprar_cero() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
+            sistema.crear_publicacion(0, 1000, 4); //La publicación la crea Charlie.
 
             //Quiero forzar el error de NoPuedeComprarCero.
-            let error_no_puede_comprar_cero = sistema.validar_orden(vec![(0, 0)], charlie).unwrap_err();
+            let error_no_puede_comprar_cero = sistema.validar_orden(vec![(0, 0)], charlie).unwrap_err(); 
             assert_eq!(error_no_puede_comprar_cero, ErrorSistema::NoPuedeComprarCero); //Ok.
+        }
 
+        #[ink::test]
+        //Test para verificar que no se puede generar una orden de compra con productos de distintos usuarios vendedores (no pasa la validación).
+        fn test_validar_orden_vendedor_distinto() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
+            sistema.crear_publicacion(0, 1000, 4); //La publicación la crea Charlie.
 
             //Quiero forzar el error de VendedorDistinto.
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
 
             let error_vendedor_distinto = sistema.validar_orden(vec![(0, 1)], alice).unwrap_err();
             assert_eq!(error_vendedor_distinto, ErrorSistema::VendedorDistinto); //Ok.
+        }
+
+        #[ink::test]
+        //Test para verificar que no se puede generar una orden de compra con stock insuficiente (no pasa la validación).
+        fn test_validar_orden_compra_stock_insuficiente() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
+            sistema.crear_publicacion(0, 1000, 4); //La publicación la crea Charlie.
 
             //Quiero forzar el error de StockInsuficiente.
-            //Vuelvo a que el caller sea charlie.
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
-            let error_stock_insuficiente = sistema.validar_orden(vec![(0, 5)], charlie).unwrap_err();
+            let error_stock_insuficiente = sistema.validar_orden(vec![(0, 5)], charlie).unwrap_err(); //El stock es 4, y estoy tratando de comprar 5.
             assert_eq!(error_stock_insuficiente, ErrorSistema::StockInsuficiente); //Ok.
+        }
+
+        #[ink::test]
+        //Test para verificar que no se puede agregar una orden de compra con publicaciones no válidas (no pasa la validación).
+        fn test_validar_orden_publicacion_no_valida() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
+            sistema.crear_publicacion(0, 1000, 4); //La publicación la crea Charlie.
 
             //Quiero forzar el error de PublicacionNoValida.
             let error_publicacion_invalida = sistema.validar_orden(vec![(1, 1)], charlie).unwrap_err();
