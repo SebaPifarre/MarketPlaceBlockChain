@@ -1694,6 +1694,8 @@ mod usuarios_sistema {
             }
         }
 
+
+        //-------------------- seguir desde acá
         #[ink::test]
         fn test_marcar_orden_como_recibida_errores() {
             let mut sistema = Sistema::new();
@@ -1731,6 +1733,8 @@ mod usuarios_sistema {
             assert_eq!(error_operacion_no_valida, ErrorSistema::OperacionNoValida); //La orden ya fue recibida.
         }
         
+
+
         #[ink::test]
         fn test_cancelar_orden_errores() {
             let mut sistema = Sistema::new();
