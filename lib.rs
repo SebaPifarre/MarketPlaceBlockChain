@@ -1048,6 +1048,34 @@ mod usuarios_sistema {
             assert!(sistema.productos.get(0).is_none());
         }
 
+        #[ink::test]
+        //Test en el que se registra un producto correctamente desde un usuario que es vendedor.
+        fn test_nuevo_producto_usuario_vendedor() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
+
+            let id_producto = sistema.nuevo_producto(String::from("Laptop"), String::from("Laptop gamer"), Categoria::Tecnologia).unwrap();
+            // Verifico que el producto se haya registrado correctamente.
+            let producto = sistema.productos.get(&id_producto);
+            assert!(producto.is_some());
+        }
+
+        #[ink::test]
+        //Test en el que se registra un producto correctamente desde un usuario con ambos roles.
+        fn test_nuevo_producto_usuario_ambos() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            let id_producto = sistema.nuevo_producto(String::from("Laptop"), String::from("Laptop gamer"), Categoria::Tecnologia).unwrap();
+            // Verifico que el producto se haya registrado correctamente.
+            let producto = sistema.productos.get(&id_producto);
+            assert!(producto.is_some());
+        }
+
        //-------------------------------------------------------------------------------------
        //TESTS FUNCIONES INTERNAS:
 
