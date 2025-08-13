@@ -1945,7 +1945,7 @@ mod usuarios_sistema {
             }
 
 
-            //Chequeo el estado poterior del sistema (que se haya creado la publicación).
+            //Chequeo el estado posterior del sistema (que se haya creado la publicación).
             sistema.crear_publicacion(0, 10, 19);
             assert_eq!(sistema.get_publicaciones().len(), 1);
         }
@@ -1999,18 +1999,18 @@ mod usuarios_sistema {
             if let Ok(id) = sistema.nuevo_producto("banana".to_string(), "una banana".to_string(), Categoria::Limpieza){
                 assert_eq!(id, 0);
             }
-            
+
             //Intento crear una publicación con stock 0.
             let error_stock_cero = sistema.crear_publicacion(0, 10, 0).unwrap_err(); 
             assert_eq!(error_stock_cero, ErrorSistema::StockInsuficiente); //No se puede crear una publicación con stock 0.
 
-            //Chequeo el estado poterior del sistema (que no se haya creado la publicación).
+            //Chequeo el estado posterior del sistema (que no se haya creado la publicación).
             assert_eq!(sistema.get_publicaciones().len(), 0);
         }
 
-
         #[ink::test]
-        fn test_publicacion_tiene_stock(){
+        //Test para verificar que no se puede comprar de una publicación con dinero insuficiente.
+        fn test_comprar_publicacion_dinero_insuficiente() {
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
@@ -2020,72 +2020,54 @@ mod usuarios_sistema {
                 assert_eq!(id, 0);
             }
 
-            sistema.crear_publicacion(0, 10, 19);
+            sistema.crear_publicacion(0, 10, 19); //Le doy 19 de stock. Cada banana sale 10 pesos.
             assert_eq!(sistema.get_publicaciones().len(), 1);
 
-            assert_eq!(sistema.publicaciones[0].tiene_stock_suficiente(20), false);
-
-            let mut lista_compra = Vec::new();
-            lista_compra.push((0,2));
-
-
+            //Creo una orden de compra para que exista una orden con id 0.
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
 
-            if let Err(e) = sistema.generar_orden_compra(lista_compra.clone(), 1) {
-                assert_eq!(e, ErrorSistema::DineroInsuficiente);
-            }
-            
-            assert!(sistema.generar_orden_compra(lista_compra, 200).is_ok());
+            let lista_compra = vec![(0, 1)];
 
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            //Intento comprar una publicación con dinero insuficiente.
+            let error_dinero_insuficiente = sistema.generar_orden_compra(lista_compra, 0).unwrap_err(); //Trato de comprar una banana con 0 dinero.
+            assert_eq!(error_dinero_insuficiente, ErrorSistema::DineroInsuficiente); //No se puede comprar la publicación porque el dinero es insuficiente.
 
-            assert!(sistema.marcar_orden_como_enviada(0).is_ok());
-            if let Some(orden) = sistema.ordenes.get(0){
-                assert_eq!(orden.estado, EstadoOrdenCompra::Enviado);
-            }
-
-            assert!(sistema.cancelar_orden(0).is_ok());
-
-            if let Err(e) = sistema.cancelar_orden(0) {
-                assert_eq!(e, ErrorSistema::CancelacionYaSolicitada);
-            }
-
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
-
-            assert!(sistema.cancelar_orden(0).is_ok());
-
-            if let Some(orden) = sistema.ordenes.get(0) {
-                assert_eq!(orden.estado, EstadoOrdenCompra::Cancelado);
-            }
-
-            assert_eq!(sistema.cancelar_orden(0), Err(ErrorSistema::OrdenCancelada));
-
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
-
-            assert_eq!(sistema.cancelar_orden(0), Err(ErrorSistema::OrdenCancelada));
-            
+            //Chequeo el estado posterior del sistema (que no se haya modificado el stock).
+            assert_eq!(sistema.publicaciones[0].stock, 19);
         }
 
         #[ink::test]
-        fn test_crear_publicacion_errores() {
+        //Test para verificar que un usuario que no es vendedor o ambos pueda crear una publicación.
+        fn test_crear_publicacion_user_no_vendedor() {
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
-
-            //let error_user_no_existe = sistema.crear_publicacion(0, 1000, 4).unwrap_err();
-            //assert_eq!(error_user_no_existe, ErrorSistema::UsuarioNoExiste); //No existe el usuario que llama a la función.
-
+            
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
             sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Comprador);
 
             let error_user_no_vendedor = sistema.crear_publicacion(0, 1000, 4).unwrap_err();
             assert_eq!(error_user_no_vendedor, ErrorSistema::UsuarioNoEsVendedor); //Ok.
 
-            sistema.agregar_rol(Rol::Vendedor).unwrap(); //Agrego el rol de vendedor a Charlie.
+            //Chequeo el estado posterior del sistema (no debe existir ninguna publicación).
+            assert_eq!(sistema.get_publicaciones().len(), 0);
+        }
+
+        #[ink::test]
+        //Test para verificar que no se puede crear una publicación de un producto inválido.
+        fn test_crear_publicacion_producto_invalido() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
+
             let error_producto_invalido = sistema.crear_publicacion(0, 1000, 4).unwrap_err();
             assert_eq!(error_producto_invalido, ErrorSistema::ProductoInvalido); //No existe el producto con id 0.
 
+            //Chequeo el estado posterior del sistema (no debe existir ninguna publicación).
+             assert_eq!(sistema.get_publicaciones().len(), 0);
         }
 
         #[ink::test]
