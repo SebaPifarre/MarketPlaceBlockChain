@@ -488,6 +488,10 @@ mod usuarios_sistema {
                 return Err(ErrorSistema::ProductoInvalido);
             }
 
+            if stock == 0 {
+                return Err(ErrorSistema::StockInsuficiente);
+            }
+
             // Este unwrap se puede realizar sin problema porque la funcion es_vendedor() ya verifica si existe el usuario.
             let mut usuario = self.usuarios.get(&usuario_id).unwrap();
 
@@ -1927,6 +1931,83 @@ mod usuarios_sistema {
 
         //-------------------------------------------------------------------------------------
         //TESTS PUBLICACIONES Y STOCK:
+
+        #[ink::test]
+        //Test para verificar que se puede crear una publicación correctamente.
+        fn test_crear_publicacion() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
+
+            if let Ok(id) = sistema.nuevo_producto("banana".to_string(), "una banana".to_string(), Categoria::Limpieza){
+                assert_eq!(id, 0);
+            }
+
+
+            //Chequeo el estado poterior del sistema (que se haya creado la publicación).
+            sistema.crear_publicacion(0, 10, 19);
+            assert_eq!(sistema.get_publicaciones().len(), 1);
+        }
+
+        #[ink::test]
+        //Test para verificar que tiene_stock_suficiente funcione correctamente.
+        fn test_publicacion_tiene_stock_suficiente(){
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
+
+            if let Ok(id) = sistema.nuevo_producto("banana".to_string(), "una banana".to_string(), Categoria::Limpieza){
+                assert_eq!(id, 0);
+            }
+
+            sistema.crear_publicacion(0, 10, 19);
+            assert_eq!(sistema.get_publicaciones().len(), 1);
+
+            assert_eq!(sistema.publicaciones[0].tiene_stock_suficiente(5), true);
+            assert_eq!(sistema.publicaciones[0].tiene_stock_suficiente(10), true);
+        }
+
+        #[ink::test]
+        //Test que verifica que tiene_stock_suficiente funcione correctamente cuando el stock es insuficiente.
+        fn test_publicacion_tiene_stock_insuficiente() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
+
+            if let Ok(id) = sistema.nuevo_producto("banana".to_string(), "una banana".to_string(), Categoria::Limpieza){
+                assert_eq!(id, 0);
+            }
+
+            sistema.crear_publicacion(0, 10, 19); //Le doy 19 de stock.
+            assert_eq!(sistema.get_publicaciones().len(), 1);
+
+            assert_eq!(sistema.publicaciones[0].tiene_stock_suficiente(20), false);
+        }
+
+
+        #[ink::test]
+        //Test que verifica que no se puede crear una publicación con stock 0.
+        fn test_crear_publicacion_stock_cero() {
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Vendedor);
+
+            if let Ok(id) = sistema.nuevo_producto("banana".to_string(), "una banana".to_string(), Categoria::Limpieza){
+                assert_eq!(id, 0);
+            }
+            
+            //Intento crear una publicación con stock 0.
+            let error_stock_cero = sistema.crear_publicacion(0, 10, 0).unwrap_err(); 
+            assert_eq!(error_stock_cero, ErrorSistema::StockInsuficiente); //No se puede crear una publicación con stock 0.
+
+            //Chequeo el estado poterior del sistema (que no se haya creado la publicación).
+            assert_eq!(sistema.get_publicaciones().len(), 0);
+        }
+
 
         #[ink::test]
         fn test_publicacion_tiene_stock(){
