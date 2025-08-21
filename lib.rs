@@ -70,6 +70,7 @@ mod usuarios_sistema {
         DineroInsuficiente,
         FueraDeRango,
         OrdenCancelada,
+        UsuarioNoTieneProducto,
     }
 
     /// # Esta es la estructura de un usuario.
@@ -106,6 +107,9 @@ mod usuarios_sistema {
 
         /// Lista de ´Ordenes de Compra´ (Id de Ordenes de compra) que tiene un Usuario ´Comprador´
         ordenes: Vec<u128>,
+
+        /// Hashmap de productos del vendedor
+        productos: Vec<u128>,
     }
     
     
@@ -361,7 +365,7 @@ mod usuarios_sistema {
                 return Err(ErrorSistema::UsuarioYaRegistrado);
             }                
             
-            self.usuarios.insert(id, &Usuario {nombre, apellido, email, id, rol, publicaciones: Vec::<u128>::new(), ordenes: Vec::<u128>::new()});
+            self.usuarios.insert(id, &Usuario {nombre, apellido, email, id, rol, publicaciones: Vec::<u128>::new(), ordenes: Vec::<u128>::new(), productos: Vec::<u128>::new()});
             Ok(())
         }
 
@@ -429,7 +433,8 @@ mod usuarios_sistema {
         #[ink(message)]
         pub fn nuevo_producto(&mut self, nombre: String, descripcion: String, categoria: Categoria) -> Result<u128, ErrorSistema> {
             //El usuario que genera el producto debe existir en el sistema, y ser vendedor.
-            if let Err(e) = self._existe_usuario(self.env().caller()) {
+            let usuario_id = self.env().caller(); 
+            if let Err(e) = self._existe_usuario(usuario_id) {
                 return Err(e);
             }
 
@@ -439,10 +444,28 @@ mod usuarios_sistema {
 
             let id_producto = self.generar_id_producto()?;
 
-            self.productos.insert(id_producto, &Producto {
+            self.productos.insert(id_producto.clone(), &Producto {
                 nombre,
                 descripcion,
                 categoria
+            });
+
+            // Agregar producto a lista personal del vendedor
+            
+            // Este unwrap se puede realizar sin problema porque la funcion es_vendedor() ya verifica si existe el usuario.
+            let mut usuario = self.usuarios.get(&usuario_id).unwrap();
+
+            usuario.productos.push(id_producto.clone());
+
+            self.usuarios.insert(&usuario_id, &Usuario {
+                nombre: usuario.nombre,
+                apellido: usuario.apellido,
+                email: usuario.email,
+                id: usuario.id,
+                rol: usuario.rol,
+                publicaciones: usuario.publicaciones,
+                ordenes: usuario.ordenes,
+                productos: usuario.productos,
             });
 
             Ok(id_producto)
@@ -495,6 +518,10 @@ mod usuarios_sistema {
             // Este unwrap se puede realizar sin problema porque la funcion es_vendedor() ya verifica si existe el usuario.
             let mut usuario = self.usuarios.get(&usuario_id).unwrap();
 
+            if !usuario.productos.contains(&id_producto) {
+                return Err(ErrorSistema::UsuarioNoTieneProducto);
+            }
+
             // Agrego la publicación
             let id_publicacion = self.generar_id_publicacion()?;
 
@@ -520,6 +547,7 @@ mod usuarios_sistema {
                 rol: usuario.rol,
                 publicaciones: usuario.publicaciones,
                 ordenes: usuario.ordenes,
+                productos: usuario.productos,
             });
 
             Ok(())
@@ -2209,6 +2237,37 @@ mod usuarios_sistema {
                 assert_eq!(p.actualizar_stock(u32::MAX), Err(ErrorSistema::PublicacionesLleno))
             }
 
+        }
+
+        #[ink::test]
+        fn test_vector_de_productos_de_usuario(){
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+            sistema.nuevo_producto("Cif".to_string(), "Cif".to_string(), Categoria::Limpieza);
+
+            let user = sistema.usuarios.get(&charlie).unwrap();
+
+            assert_eq!(user.productos.len(),1);
+
+        }
+
+        #[ink::test]
+        fn publicacion_con_usuario_sin_prodcuto_seleccionado(){
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+            sistema.nuevo_producto("Cif".to_string(), "Cif".to_string(), Categoria::Limpieza);
+
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
+
+            if let Err(e) = sistema.crear_publicacion(0, 20, 1) {
+                assert_eq!(e, ErrorSistema::UsuarioNoTieneProducto);
+            }
         }
 
         //-------------------------------------------------------------------------------------
