@@ -71,6 +71,7 @@ mod usuarios_sistema {
         FueraDeRango,
         OrdenCancelada,
         UsuarioNoTieneProducto,
+        UsuarioNoAutorizado,
     }
 
     /// # Esta es la estructura de un usuario.
@@ -836,6 +837,11 @@ mod usuarios_sistema {
 
             if let Some(orden_actual) = self.ordenes.get_mut(id_actual as usize) {
 
+                if orden_actual.id_vendedor != caller && orden_actual.id_comprador != caller {
+                    return Err(ErrorSistema::UsuarioNoAutorizado);
+                }
+            
+
                 if orden_actual.estado == EstadoOrdenCompra::Cancelado {
                     return Err(ErrorSistema::OrdenCancelada);
                 }
@@ -976,11 +982,15 @@ mod usuarios_sistema {
             }
         }
 
+    
+
     /// Unit tests in Rust are normally defined within such a `#[cfg(test)]`
     /// module and test functions are marked with a `#[test]` attribute.
     /// The below code is technically just normal Rust code.
     #[cfg(test)]
     mod tests {
+        use core::f32::consts::E;
+
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
 
@@ -1106,6 +1116,39 @@ mod usuarios_sistema {
             // Verifico que el producto se haya registrado correctamente.
             let producto = sistema.productos.get(&id_producto);
             assert!(producto.is_some());
+        }
+
+        #[ink::test]
+        // Test para corroborar que al crear un producto, se agregue tambien al vector del usuario
+        fn test_vector_de_productos_de_usuario(){
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+            sistema.nuevo_producto("Cif".to_string(), "Cif".to_string(), Categoria::Limpieza);
+
+            let user = sistema.usuarios.get(&charlie).unwrap();
+
+            assert_eq!(user.productos.len(),1);
+
+        }
+
+        #[ink::test]
+        // test para no permitir que un usuario cree una publicacion con un producto que no haya creado este
+        fn publicacion_con_usuario_sin_prodcuto_seleccionado(){
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+            sistema.nuevo_producto("Cif".to_string(), "Cif".to_string(), Categoria::Limpieza);
+
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
+
+            if let Err(e) = sistema.crear_publicacion(0, 20, 1) {
+                assert_eq!(e, ErrorSistema::UsuarioNoTieneProducto);
+            }
         }
 
        //-------------------------------------------------------------------------------------
@@ -1895,6 +1938,11 @@ mod usuarios_sistema {
             //Quiero forzar el error de OperacionNoValida.
             let error_caller_invalido = sistema.marcar_orden_como_recibida(0).unwrap_err();
             assert_eq!(error_caller_invalido, ErrorSistema::OperacionNoValida); //El caller no es el comprador de la orden.
+
+            //Verifico el error de marcar como recibida una orden que no existe
+            if let Err(e) = sistema.marcar_orden_como_recibida(5){
+                assert_eq!(e, ErrorSistema::IdDeOrdenNoValida)
+            }
         }        
 
 
@@ -1944,6 +1992,11 @@ mod usuarios_sistema {
                 panic!("La orden no fue encontrada después de cancelarla.");
             }
 
+            //Chequeo que una vez solicitada, no puede solicitar su cancelacion de nuevo
+            if let Err(e) = sistema.cancelar_orden(0) {
+                assert_eq!(e, ErrorSistema::CancelacionYaSolicitada)
+            }
+
             //Ahora cancelo desde quien la creó (Charlie).
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
             assert!(sistema.cancelar_orden(0).is_ok());
@@ -1953,6 +2006,37 @@ mod usuarios_sistema {
                 assert_eq!(orden.estado, EstadoOrdenCompra::Cancelado);
             } else {
                 panic!("La orden no fue encontrada después de cancelarla.");
+            }
+
+            //Chequeo que una vez cancelado, no pueda solicitar su cancelacion de nuevo
+            if let Err(e) = sistema.cancelar_orden(0) {
+                assert_eq!(e, ErrorSistema::OrdenCancelada)
+            }
+        }
+
+        #[ink::test]
+        // test que verifica que un usuario que no esta involucrado en una orden no pueda cancelarla
+        fn tercero_no_puede_cancelar_orden(){
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+
+            sistema.ordenes.push(
+                OrdenCompra {
+                    lista_productos: vec!((1,1)),
+                    id_orden_compra: 0,
+                    estado: EstadoOrdenCompra::Pendiente,
+                    id_comprador:charlie,
+                    id_vendedor:alice,
+                    solicitud_cancelacion: None,
+                    monto:23,
+                }
+            );
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
+
+            if let Err(e) = sistema.cancelar_orden(0){
+                assert_eq!(e, ErrorSistema::UsuarioNoAutorizado);
             }
         }
 
@@ -2237,37 +2321,6 @@ mod usuarios_sistema {
                 assert_eq!(p.actualizar_stock(u32::MAX), Err(ErrorSistema::PublicacionesLleno))
             }
 
-        }
-
-        #[ink::test]
-        fn test_vector_de_productos_de_usuario(){
-            let mut sistema = Sistema::new();
-            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
-            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
-            sistema.nuevo_producto("Cif".to_string(), "Cif".to_string(), Categoria::Limpieza);
-
-            let user = sistema.usuarios.get(&charlie).unwrap();
-
-            assert_eq!(user.productos.len(),1);
-
-        }
-
-        #[ink::test]
-        fn publicacion_con_usuario_sin_prodcuto_seleccionado(){
-            let mut sistema = Sistema::new();
-            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
-            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
-            sistema.nuevo_producto("Cif".to_string(), "Cif".to_string(), Categoria::Limpieza);
-
-            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
-            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
-            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
-
-            if let Err(e) = sistema.crear_publicacion(0, 20, 1) {
-                assert_eq!(e, ErrorSistema::UsuarioNoTieneProducto);
-            }
         }
 
         //-------------------------------------------------------------------------------------
