@@ -112,6 +112,10 @@ mod usuarios_sistema {
 
         /// Hashmap de productos del vendedor
         productos: Vec<u128>,
+
+        /// Calificaciones para calcular reputación
+        //  calificaciones_como_comprador: Vec<u8>;
+        //  calificaciones_como_vendedor: Vec<u8>;
     }
     
     
@@ -2418,5 +2422,31 @@ mod reporte {
             .instantiate();
 
         Self { usuarios_sistema }
+    }
+
+    impl reporte {
+        #[ink(message)]
+        pub fn top5_compradores() -> Vec<Usuario> {
+        }
+
+        #[ink(message)]
+        pub fn top5_vendedores() -> Vec<Usuario> {
+        }
+
+        #[ink(message)]
+        pub fn top5_reputacion() -> Vec<Usuario> {
+        }
+
+        #[ink(message)]
+        pub fn top5_reputacion() -> Vec<Usuario> {
+        }
+
+        #[ink(message)]
+        pub fn estadisticas_categorias() -> ? {
+        }
+
+        #[ink(message)]
+        pub fn ordenes_usuario() -> u128 {
+        }
     }
 }
