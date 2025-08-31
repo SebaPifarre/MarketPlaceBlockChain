@@ -6,6 +6,7 @@ mod usuarios_sistema {
     use ink::storage::Mapping;   
     use ink::prelude::vec::Vec;
     use ink::prelude::collections::BTreeSet;
+    use reporte::ReporteRef;
 
     #[ink(storage)]
 
@@ -2396,5 +2397,26 @@ mod usuarios_sistema {
 
             Ok(())
         }
+    }
+}
+
+#[ink::contract]
+mod reporte {
+    use super::usuarios_sistema::UsuariosSistemaRef;
+
+    #[ink(storage)]
+    pub struct ReporteRef {
+        usuarios_sistema: UsuariosSistemaRef,
+    }
+
+    #[ink(constructor)]
+    pub fn new(usuarios_sistema_code_hash: Hash) -> Self {
+        let usuarios_sistema = OtherContractRef::new(true)
+            .code_hash(usuarios_sistema_code_hash)
+            .endowment(0)
+            .salt_bytes([0xDE, 0xAD, 0xBE, 0xEF])
+            .instantiate();
+
+        Self { usuarios_sistema }
     }
 }
