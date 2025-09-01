@@ -72,6 +72,9 @@ mod usuarios_sistema {
         OrdenCancelada,
         UsuarioNoTieneProducto,
         UsuarioNoAutorizado,
+        PuntuacionNoValida,
+        OrdenYaPuntuada,
+        NoPuedePuntuarOrdenSinRecibir,
     }
 
     /// # Esta es la estructura de un usuario.
@@ -111,6 +114,11 @@ mod usuarios_sistema {
 
         /// Hashmap de productos del vendedor
         productos: Vec<u128>,
+
+        /// Vector de calificaciones del usuario como comprador y como vendedor
+        calificaciones_comprador: Vec<u8>,
+
+        calificaciones_vendedor: Vec<u8>,
     }
     
     
@@ -229,6 +237,10 @@ mod usuarios_sistema {
         solicitud_cancelacion: Option<AccountId>,
 
         monto:u32,
+
+        puntuado_por_comprador: bool,
+
+        puntuado_por_vendedor: bool,
 
     }
 
@@ -366,7 +378,7 @@ mod usuarios_sistema {
                 return Err(ErrorSistema::UsuarioYaRegistrado);
             }                
             
-            self.usuarios.insert(id, &Usuario {nombre, apellido, email, id, rol, publicaciones: Vec::<u128>::new(), ordenes: Vec::<u128>::new(), productos: Vec::<u128>::new()});
+            self.usuarios.insert(id, &Usuario {nombre, apellido, email, id, rol, publicaciones: Vec::<u128>::new(), ordenes: Vec::<u128>::new(), productos: Vec::<u128>::new(), calificaciones_comprador: Vec::<u8>::new(), calificaciones_vendedor: Vec::<u8>::new()});
             Ok(())
         }
 
@@ -467,6 +479,8 @@ mod usuarios_sistema {
                 publicaciones: usuario.publicaciones,
                 ordenes: usuario.ordenes,
                 productos: usuario.productos,
+                calificaciones_comprador: usuario.calificaciones_comprador,
+                calificaciones_vendedor: usuario.calificaciones_vendedor,
             });
 
             Ok(id_producto)
@@ -549,6 +563,8 @@ mod usuarios_sistema {
                 publicaciones: usuario.publicaciones,
                 ordenes: usuario.ordenes,
                 productos: usuario.productos,
+                calificaciones_comprador: usuario.calificaciones_comprador,
+                calificaciones_vendedor: usuario.calificaciones_vendedor,
             });
 
             Ok(())
@@ -631,6 +647,8 @@ mod usuarios_sistema {
                 id_vendedor: vendedor_actual,
                 solicitud_cancelacion: None,
                 monto: monto_total,
+                puntuado_por_comprador: false,
+                puntuado_por_vendedor: false,
             };
             
             // Agrego la orden al vector de órdenes.
@@ -871,6 +889,87 @@ mod usuarios_sistema {
             
         }
 
+        /// Permite a los usuarios puntuar al comprador o al vendedor después de finalizar una orden
+        /// Solo los usuarios involucrados en la orden pueden interactuar
+        /// Solo se puede puntuar una vez por usuario y por orden
+        /// La puntuación es entre 1 y 5
+        #[ink(message)]
+        pub fn puntuar_usuario_por_orden(&mut self, id_orden:u128, puntuacion:u8) -> Result<(), ErrorSistema> {
+            let caller = self.env().caller();
+            self._puntuar_usuario_por_orden(id_orden, puntuacion, caller)
+        }
+
+        fn _puntuar_usuario_por_orden(&mut self, id_orden:u128, puntuacion:u8, caller:AccountId)->Result<(), ErrorSistema>{
+            if puntuacion > 5 || puntuacion < 1 {
+                return Err(ErrorSistema::PuntuacionNoValida);
+            }
+            else {
+                if let Some(orden) = self.ordenes.get_mut(id_orden as usize) {
+                    if orden.estado != EstadoOrdenCompra::Recibido {
+                        return Err(ErrorSistema::NoPuedePuntuarOrdenSinRecibir);
+                    }
+                    else {
+
+                    
+
+                        if orden.id_comprador == caller {
+                            if orden.puntuado_por_comprador {
+                                return Err(ErrorSistema::OrdenYaPuntuada);
+                            }
+                            else {
+                                let mut user = self.usuarios.get(orden.id_vendedor).unwrap();
+                                user.calificaciones_vendedor.push(puntuacion);
+                                self.usuarios.insert(&orden.id_vendedor, &user);
+                                orden.puntuado_por_comprador = true;
+                                return Ok(());
+                            }
+                        }
+                        else 
+                            if orden.id_vendedor == caller {
+                                if orden.puntuado_por_vendedor {
+                                    return Err(ErrorSistema::OrdenYaPuntuada);
+                                }
+                                else {
+                                    let mut user = self.usuarios.get(orden.id_comprador).unwrap();
+                                    user.calificaciones_comprador.push(puntuacion);
+                                    self.usuarios.insert(&orden.id_comprador, &user);
+                                    orden.puntuado_por_vendedor = true;
+                                    return Ok(());
+                                }
+                            }
+
+                            else {
+                                return Err(ErrorSistema::UsuarioNoAutorizado);
+                            }
+                        
+                    }
+                }
+                else {
+                    return Err(ErrorSistema::IdDeOrdenNoValida);
+                }
+            }
+
+        }
+
+        #[ink(message)]
+        pub fn obtener_puntuacion_de_comprador(&self, id_usuario:AccountId)->Result<u8, ErrorSistema>{
+            if let Some(user) = self.usuarios.get(id_usuario) {
+                return Ok(user.calcular_puntaje_como_comprador());
+            }
+            else {
+                return Err(ErrorSistema::UsuarioNoExiste);
+            }
+        }
+
+        #[ink(message)]
+        pub fn obtener_puntuacion_de_vendedor(&self, id_usuario:AccountId)->Result<u8, ErrorSistema>{
+            if let Some(user) = self.usuarios.get(id_usuario) {
+                return Ok(user.calcular_puntaje_como_vendedor());
+            }
+            else {
+                return Err(ErrorSistema::UsuarioNoExiste);
+            }
+        }
 
 
 
@@ -963,6 +1062,24 @@ mod usuarios_sistema {
                 _ => rol,
             };
             Ok(())
+        }
+
+        fn calcular_puntaje_como_comprador(&self) -> u8 {
+            if self.calificaciones_comprador.is_empty() {
+            return 0;
+        }
+        let sum: u32 = self.calificaciones_comprador.iter().map(|&x| x as u32).sum();
+        let avg = sum / self.calificaciones_comprador.len() as u32;
+        avg as u8
+        }
+
+        fn calcular_puntaje_como_vendedor(&self) -> u8 {
+            if self.calificaciones_vendedor.is_empty() {
+            return 0;
+        }
+        let sum: u32 = self.calificaciones_vendedor.iter().map(|&x| x as u32).sum();
+        let avg = sum / self.calificaciones_vendedor.len() as u32;
+        avg as u8
         }
     }
 
@@ -2030,6 +2147,8 @@ mod usuarios_sistema {
                     id_vendedor:alice,
                     solicitud_cancelacion: None,
                     monto:23,
+                    puntuado_por_comprador:false,
+                    puntuado_por_vendedor:false,
                 }
             );
             let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
@@ -2038,6 +2157,169 @@ mod usuarios_sistema {
             if let Err(e) = sistema.cancelar_orden(0){
                 assert_eq!(e, ErrorSistema::UsuarioNoAutorizado);
             }
+        }
+
+        //-------------------------------------------------------------------------------------
+        //TESTS PUNTUACIÓN A USUARIOS
+
+        #[ink::test]
+        //Test puntuar funciona correctamente.
+        fn test_puntuar_ok(){
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+
+            sistema.ordenes.push(
+                OrdenCompra {
+                    lista_productos: vec!((1,1)),
+                    id_orden_compra: 0,
+                    estado: EstadoOrdenCompra::Recibido,
+                    id_comprador:charlie,
+                    id_vendedor:alice,
+                    solicitud_cancelacion: None,
+                    monto:23,
+                    puntuado_por_comprador:false,
+                    puntuado_por_vendedor:false,
+                }
+            );
+            sistema._registrar_usuario("charlie".to_string(), "zz".to_string(), "char.zz@gmail.com".to_string(), Rol::Ambos, charlie);
+            sistema._registrar_usuario("alice".to_string(), "jhg".to_string(), "alialice@gmail.com".to_string(), Rol::Ambos, alice);
+
+            assert_eq!(sistema.usuarios.get(alice).unwrap().calificaciones_vendedor.len(),0);
+            assert_eq!(sistema.usuarios.get(charlie).unwrap().calificaciones_comprador.len(),0);
+
+            assert!(sistema._puntuar_usuario_por_orden(0, 3, charlie).is_ok());
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            assert!(sistema.puntuar_usuario_por_orden(0, 3).is_ok());
+
+            assert_eq!(sistema.usuarios.get(alice).unwrap().calificaciones_vendedor.len(),1);
+            assert_eq!(sistema.usuarios.get(charlie).unwrap().calificaciones_comprador.len(),1);
+
+           
+        }
+
+        #[ink::test]
+        //Test para verificar que un usuario no pueda puntuar mas de una vez y comprobaciones previas.
+        fn test_errores_al_puntuar(){
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+
+            sistema.ordenes.push(
+                OrdenCompra {
+                    lista_productos: vec!((1,1)),
+                    id_orden_compra: 0,
+                    estado: EstadoOrdenCompra::Recibido,
+                    id_comprador:charlie,
+                    id_vendedor:alice,
+                    solicitud_cancelacion: None,
+                    monto:23,
+                    puntuado_por_comprador:true,
+                    puntuado_por_vendedor:true,
+                }
+            );
+            sistema._registrar_usuario("charlie".to_string(), "zz".to_string(), "char.zz@gmail.com".to_string(), Rol::Ambos, charlie);
+            sistema._registrar_usuario("alice".to_string(), "jhg".to_string(), "alialice@gmail.com".to_string(), Rol::Ambos, alice);
+
+            assert_eq!(sistema._puntuar_usuario_por_orden(1, 3, charlie).unwrap_err(), ErrorSistema::IdDeOrdenNoValida);
+
+            assert_eq!(sistema._puntuar_usuario_por_orden(0, 6, alice).unwrap_err(), ErrorSistema::PuntuacionNoValida);
+
+            assert_eq!(sistema._puntuar_usuario_por_orden(0, 2, charlie).unwrap_err(), ErrorSistema::OrdenYaPuntuada);
+
+            assert_eq!(sistema._puntuar_usuario_por_orden(0, 2, alice).unwrap_err(), ErrorSistema::OrdenYaPuntuada);
+
+
+           
+        }
+
+         #[ink::test]
+        //Test para verificar que un usuario no pueda puntuar una orden no marcada como recibida ni por terceros.
+        fn test_puntuar_orden_recibida(){
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+
+            sistema.ordenes.push(
+                OrdenCompra {
+                    lista_productos: vec!((1,1)),
+                    id_orden_compra: 0,
+                    estado: EstadoOrdenCompra::Enviado,
+                    id_comprador:charlie,
+                    id_vendedor:alice,
+                    solicitud_cancelacion: None,
+                    monto:23,
+                    puntuado_por_comprador:true,
+                    puntuado_por_vendedor:true,
+                }
+            );
+            sistema._registrar_usuario("charlie".to_string(), "zz".to_string(), "char.zz@gmail.com".to_string(), Rol::Ambos, charlie);
+            sistema._registrar_usuario("alice".to_string(), "jhg".to_string(), "alialice@gmail.com".to_string(), Rol::Ambos, alice);
+
+            assert_eq!(sistema._puntuar_usuario_por_orden(0, 1, charlie).unwrap_err(), ErrorSistema::NoPuedePuntuarOrdenSinRecibir);
+
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+
+            sistema.ordenes.push(
+                OrdenCompra {
+                    lista_productos: vec!((1,1)),
+                    id_orden_compra: 1,
+                    estado: EstadoOrdenCompra::Recibido,
+                    id_comprador:charlie,
+                    id_vendedor:alice,
+                    solicitud_cancelacion: None,
+                    monto:23,
+                    puntuado_por_comprador:false,
+                    puntuado_por_vendedor:false,
+                }
+            );
+            assert_eq!(sistema._puntuar_usuario_por_orden(1, 5, bob).unwrap_err(), ErrorSistema::UsuarioNoAutorizado);
+
+           
+        }
+
+        #[ink::test]
+        // tests para obtener los puntajes.
+        fn test_obtener_puntajes(){
+            let mut sistema = Sistema::new();
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+
+            sistema.usuarios.insert(charlie, 
+                &Usuario{
+                    nombre:"carlos".to_string(),
+                    apellido:"cc".to_string(),
+                    email:"carlocc".to_string(),
+                    id:charlie,
+                    rol:Rol::Ambos,
+                    publicaciones:Vec::new(),
+                    ordenes:Vec::new(),
+                    productos:Vec::new(),
+                    calificaciones_comprador:vec!(2,3,4),
+                    calificaciones_vendedor:vec!(5,5,5),
+            });
+            assert_eq!(sistema.obtener_puntuacion_de_comprador(alice).unwrap_err(), ErrorSistema::UsuarioNoExiste);
+            assert_eq!(sistema.obtener_puntuacion_de_vendedor(alice).unwrap_err(), ErrorSistema::UsuarioNoExiste);
+            
+            sistema.usuarios.insert(alice, 
+                &Usuario{
+                    nombre:"carlos".to_string(),
+                    apellido:"cc".to_string(),
+                    email:"carlocc".to_string(),
+                    id:charlie,
+                    rol:Rol::Ambos,
+                    publicaciones:Vec::new(),
+                    ordenes:Vec::new(),
+                    productos:Vec::new(),
+                    calificaciones_comprador:Vec::new(),
+                    calificaciones_vendedor:Vec::new(),
+            });
+            assert_eq!(sistema.obtener_puntuacion_de_comprador(alice), Ok(0));
+            assert_eq!(sistema.obtener_puntuacion_de_vendedor(alice), Ok(0));
+            
+            assert_eq!(sistema.obtener_puntuacion_de_comprador(charlie), Ok(3));
+            assert_eq!(sistema.obtener_puntuacion_de_vendedor(charlie), Ok(5));
         }
 
 
