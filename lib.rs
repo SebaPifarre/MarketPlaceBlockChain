@@ -31,6 +31,7 @@ mod usuarios_sistema {
     /// ```
     pub struct Sistema {
         usuarios: ink::storage::Mapping<AccountId, Usuario>,
+        id_usuarios: Vec<AccountId>,
         publicaciones: Vec<Publicacion>,
         productos: Mapping<u128, Producto>,
         ordenes: Vec<OrdenCompra>,
@@ -270,7 +271,7 @@ mod usuarios_sistema {
         /// ```
         #[ink(constructor)]
         pub fn new() -> Self {
-            Self {  usuarios: Mapping::new(), publicaciones: Vec::<Publicacion>::new(), productos: Mapping::new(), ordenes:Vec::new(), proximo_id_publicacion: 0, proximo_id_producto: 0 , proximo_id_orden: 0}
+            Self {id_usuarios: Vec::<AccountId>::new(),  usuarios: Mapping::new(), publicaciones: Vec::<Publicacion>::new(), productos: Mapping::new(), ordenes:Vec::new(), proximo_id_publicacion: 0, proximo_id_producto: 0 , proximo_id_orden: 0}
         }
 
 
@@ -379,6 +380,10 @@ mod usuarios_sistema {
             }                
             
             self.usuarios.insert(id, &Usuario {nombre, apellido, email, id, rol, publicaciones: Vec::<u128>::new(), ordenes: Vec::<u128>::new(), productos: Vec::<u128>::new(), calificaciones_comprador: Vec::<u8>::new(), calificaciones_vendedor: Vec::<u8>::new()});
+            
+            //Agrego el id al vector id_usuarios.
+            self.id_usuarios.push(id);
+
             Ok(())
         }
 
@@ -1049,7 +1054,32 @@ mod usuarios_sistema {
             }
             mis_ordenes
         }
+
+        //LAS SIGUIENTES FUNCIONES SON PARTE DEL CONTRATO 2. CORRER EN EL FUTURO (ESPACIO TEMPORAL)
+        //Consultar top 5 vendedores con mejor reputación
+        /* #[ink(message)]
+        pub fn consultar_top_5_vendedores(&self) -> Vec<Usuario> {
+            self._consultar_top_5_vendedores()
+        }
+
+        fn _consultar_top_5_vendedores(&self) -> Vec<Usuario> {
+            //Creo un vector con los vendedores.
+            let mut vendedores: Vec<Usuario> = self.usuarios
+                .into_iter()  // Lo convierto en un iterator.
+                .filter(|(_, user)| user.rol == Rol::Vendedor || user.rol == Rol::Ambos)
+                .map(|(_, user)| user)  //Extraigo al usuario de la tupla.
+                .collect();
+
+            //Ordeno el vector en cuanto reputación de forma descendente.
+            vendedores.sort_by(|a, b| b.calcular_puntaje_como_vendedor().cmp(&a.calcular_puntaje_como_vendedor()));
+
+            //Recorto el tamaño del vector a 5.
+            vendedores.truncate(5);
+
+            vendedores
+        }*/
     }
+
 
     impl Usuario {
         pub fn agregar_rol(&mut self, rol: Rol) -> Result<(), ErrorSistema> { 
@@ -1065,21 +1095,33 @@ mod usuarios_sistema {
         }
 
         fn calcular_puntaje_como_comprador(&self) -> u8 {
-            if self.calificaciones_comprador.is_empty() {
-            return 0;
-        }
-        let sum: u32 = self.calificaciones_comprador.iter().map(|&x| x as u32).sum();
-        let avg = sum / self.calificaciones_comprador.len() as u32;
-        avg as u8
+            if !self.calificaciones_comprador.is_empty(){
+                let sum: u32 = self.calificaciones_comprador.iter().map(|&x| x as u32).sum();
+
+                if sum != 0 {
+                    let len = self.calificaciones_comprador.len() as u32;
+                    if let Some(avg) = sum.checked_div(len) {
+                        return avg as u8;
+                    }
+                
+                }
+            }
+            0
         }
 
         fn calcular_puntaje_como_vendedor(&self) -> u8 {
-            if self.calificaciones_vendedor.is_empty() {
-            return 0;
-        }
-        let sum: u32 = self.calificaciones_vendedor.iter().map(|&x| x as u32).sum();
-        let avg = sum / self.calificaciones_vendedor.len() as u32;
-        avg as u8
+            if !self.calificaciones_vendedor.is_empty(){
+                let sum: u32 = self.calificaciones_vendedor.iter().map(|&x| x as u32).sum();
+
+                if sum != 0 {
+                    let len = self.calificaciones_vendedor.len() as u32;
+                    if let Some(avg) = sum.checked_div(len) {
+                        return avg as u8;
+                    }
+                }
+                
+            }
+            0
         }
     }
 
@@ -2606,6 +2648,142 @@ mod usuarios_sistema {
         }
 
         //-------------------------------------------------------------------------------------
+        //COSAS DE MI PT DEL SEGUNDO CONTRATO
+
+        //-------------------------------------------------------------------------------------
+        //TEST ID USUARIOS
+
+        #[ink::test]
+        //Test que verifica que los IDs de los usuarios se agregan correctamente al vector de IDs.
+        fn agregar_id_okay() {
+            let mut sistema = Sistema::new();
+
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+
+            assert!(sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos).is_ok());
+            assert_eq!(sistema.id_usuarios.len(), 1); //Debe tener un ID.
+            assert_eq!(sistema.id_usuarios[0], charlie); //El ID debe ser el de Charlie.
+        }
+
+        #[ink::test]
+        //Test que verifica que el vector de ids de usuarios está vecío cuando no hay nada.
+        fn ids_vacio_okay() {
+            let sistema = Sistema::new();
+            assert!(sistema.id_usuarios.is_empty()); //El vector de IDs debe estar vacío.
+        }
+
+
+/* 
+        //TESTS PUNTUACIÓN A USUARIOS
+        #[ink::test]
+        //Test que verifica que la funcionalidad top_5_vendedores funcione correctamente. (Caso en el que hay más de 5 vendedores).
+        fn test_top_5_vendedores_okay() {
+            let mut sistema = Sistema::new();
+
+            //Preparo a los vendedores.
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+            let dave = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().dave;
+            let eve = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().eve;
+            let frank = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().frank;
+
+
+            //Los registro en el sistema con distintas calificaciones.
+            sistema.usuarios.insert(charlie, 
+                &Usuario{
+                    nombre:"carlos".to_string(),
+                    apellido:"cc".to_string(),
+                    email:"carlocc".to_string(),
+                    id:charlie,
+                    rol:Rol::Ambos,
+                    publicaciones:Vec::new(),
+                    ordenes:Vec::new(),
+                    productos:Vec::new(),
+                    calificaciones_comprador:vec!(2,3,4),
+                    calificaciones_vendedor:vec!(5,5,5),
+            });
+
+            sistema.usuarios.insert(alice, 
+                &Usuario{
+                    nombre:"alice".to_string(),
+                    apellido:"aa".to_string(),
+                    email:"aliceaa".to_string(),
+                    id:alice,
+                    rol:Rol::Ambos,
+                    publicaciones:Vec::new(),
+                    ordenes:Vec::new(),
+                    productos:Vec::new(),
+                    calificaciones_comprador:vec!(5,5,5),
+                    calificaciones_vendedor:vec!(4,4,4),
+            });
+
+            sistema.usuarios.insert(bob, 
+                &Usuario{
+                    nombre:"bob".to_string(),
+                    apellido:"bb".to_string(),
+                    email:"bobb".to_string(),
+                    id:bob,
+                    rol:Rol::Ambos,
+                    publicaciones:Vec::new(),
+                    ordenes:Vec::new(),
+                    productos:Vec::new(),
+                    calificaciones_comprador:vec!(3,3,3),
+                    calificaciones_vendedor:vec!(3,3,3),
+            });
+
+            sistema.usuarios.insert(dave, 
+                &Usuario{
+                    nombre:"dave".to_string(),
+                    apellido:"dd".to_string(),
+                    email:"daved".to_string(),
+                    id:dave,
+                    rol:Rol::Ambos,
+                    publicaciones:Vec::new(),
+                    ordenes:Vec::new(),
+                    productos:Vec::new(),
+                    calificaciones_comprador:vec!(4,4,4),
+                    calificaciones_vendedor:vec!(2,2,2),
+            });
+
+            sistema.usuarios.insert(eve, 
+                &Usuario{
+                    nombre:"eve".to_string(),
+                    apellido:"ee".to_string(),
+                    email:"evee".to_string(),
+                    id:eve,
+                    rol:Rol::Ambos,
+                    publicaciones:Vec::new(),
+                    ordenes:Vec::new(),
+                    productos:Vec::new(),
+                    calificaciones_comprador:vec!(1,1,1),
+                    calificaciones_vendedor:vec!(1,1,1),
+            });
+
+            sistema.usuarios.insert(frank, 
+                &Usuario{
+                    nombre:"frank".to_string(),
+                    apellido:"ff".to_string(),
+                    email:"frankf".to_string(),
+                    id:frank,
+                    rol:Rol::Ambos,
+                    publicaciones:Vec::new(),
+                    ordenes:Vec::new(),
+                    productos:Vec::new(),
+                    calificaciones_comprador:vec!(5,4,3),
+                    calificaciones_vendedor:vec!(5,4,3),
+            });
+
+            //Pido el top 5 de vendedores.
+            let top_5 = sistema.top_5_vendedores().unwrap();
+            assert_eq!(top_5.len(), 5); //Debe devolver 5 vendedores.
+            assert_eq!(top_5[0].0, charlie); //Charlie es el mejor vendedor (tiene promedio 5).
+            assert_eq!(top_5[1].0, alice); //Alice es el segundo mejor vendedor (tiene promedio 4).
+            assert_eq!(top_5[2].0, bob); //Bob es el tercer mejor vendedor (tiene promedio 3).
+            assert_eq!(top_5[3].0, dave); //Dave es el cuarto mejor vendedor (tiene promedio 2).
+            assert_eq!(top_5[4].0, frank); //Frank es el quinto mejor vendedor (tiene promedio 4).            
+        }*/
     }
 
 
