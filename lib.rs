@@ -2693,11 +2693,22 @@ mod usuarios_sistema {
             let eve = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().eve;
             let frank = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().frank;
 
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
             sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
             sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Vendedor);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
             sistema.registrar_usuario(String::from("Bob"), String::from("Surname"), String::from("bob.email"), Rol::Vendedor);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(django);
             sistema.registrar_usuario(String::from("Django"), String::from("Surname"), String::from("django.email"), Rol::Ambos);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(eve);
             sistema.registrar_usuario(String::from("Eve"), String::from("Surname"), String::from("eve.email"), Rol::Ambos);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(frank);
             sistema.registrar_usuario(String::from("Frank"), String::from("Surname"), String::from("frank.email"), Rol::Comprador);
 
             //Les doy las calificaciones.
