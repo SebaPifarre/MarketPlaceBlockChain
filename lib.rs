@@ -1069,7 +1069,6 @@ mod usuarios_sistema {
                 if let Some(user) = self.usuarios.get(id) {
                     if user.rol == Rol::Vendedor || user.rol == Rol::Ambos {
                         vendedores.push(user);
-                        println!("Vendedor encontrado" );
                     }
                 }
             }
@@ -1078,7 +1077,7 @@ mod usuarios_sistema {
             vendedores.sort_by(|a, b| b.calcular_puntaje_como_vendedor().cmp(&a.calcular_puntaje_como_vendedor()));
 
             //Recorto el tamaño del vector a 5.
-            //vendedores.truncate(5);
+            vendedores.truncate(5);
 
             vendedores
         }
@@ -2709,7 +2708,7 @@ mod usuarios_sistema {
             sistema.registrar_usuario(String::from("Eve"), String::from("Surname"), String::from("eve.email"), Rol::Ambos);
 
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(frank);
-            sistema.registrar_usuario(String::from("Frank"), String::from("Surname"), String::from("frank.email"), Rol::Comprador);
+            sistema.registrar_usuario(String::from("Frank"), String::from("Surname"), String::from("frank.email"), Rol::Ambos);
 
             //Les doy las calificaciones.
 
@@ -2737,13 +2736,18 @@ mod usuarios_sistema {
                 user.calificaciones_vendedor = vec![5, 5, 5];
                 sistema.usuarios.insert(&eve, &user); 
             }
+
+            if let Some(mut user) = sistema.usuarios.get(&frank) {
+                user.calificaciones_vendedor = vec![0, 0, 0];
+                sistema.usuarios.insert(&frank, &user); 
+            }
     
             //Pido el top 5 de vendedores.
             let top_5 = sistema.consultar_top_5_vendedores();
             assert_eq!(top_5.len(), 5); //Debe devolver 5 vendedores.
                 
 
-            //Chequeo que el 
+            //Chequeo que estén ordenados correctamente (de mayor a menor puntuación) y que sean los correctos. 
             assert_eq!(top_5[0].id, charlie);
             assert_eq!(top_5[1].id, eve); 
             assert_eq!(top_5[2].id, alice); 
