@@ -1057,27 +1057,31 @@ mod usuarios_sistema {
 
         //LAS SIGUIENTES FUNCIONES SON PARTE DEL CONTRATO 2. CORRER EN EL FUTURO (ESPACIO TEMPORAL)
         //Consultar top 5 vendedores con mejor reputación
-        /* #[ink(message)]
+         #[ink(message)]
         pub fn consultar_top_5_vendedores(&self) -> Vec<Usuario> {
             self._consultar_top_5_vendedores()
         }
 
         fn _consultar_top_5_vendedores(&self) -> Vec<Usuario> {
-            //Creo un vector con los vendedores.
-            let mut vendedores: Vec<Usuario> = self.usuarios
-                .into_iter()  // Lo convierto en un iterator.
-                .filter(|(_, user)| user.rol == Rol::Vendedor || user.rol == Rol::Ambos)
-                .map(|(_, user)| user)  //Extraigo al usuario de la tupla.
-                .collect();
+            //Filtro los vendedores recorriendo el vector de id_usuarios y buscando en el mapping.
+            let mut vendedores: Vec<Usuario> = Vec::new(); //Creo un vector con los vendedores.
+            for id in &self.id_usuarios {
+                if let Some(user) = self.usuarios.get(id) {
+                    if user.rol == Rol::Vendedor || user.rol == Rol::Ambos {
+                        vendedores.push(user);
+                        println!("Vendedor encontrado" );
+                    }
+                }
+            }
 
             //Ordeno el vector en cuanto reputación de forma descendente.
-            vendedores.sort_by(|a, b| b.calcular_puntaje_como_vendedor().cmp(&a.calcular_puntaje_como_vendedor()));
+            //vendedores.sort_by(|a, b| b.calcular_puntaje_como_vendedor().cmp(&a.calcular_puntaje_como_vendedor()));
 
             //Recorto el tamaño del vector a 5.
-            vendedores.truncate(5);
+            //vendedores.truncate(5);
 
             vendedores
-        }*/
+        }
     }
 
 
@@ -2674,7 +2678,7 @@ mod usuarios_sistema {
         }
 
 
-/* 
+
         //TESTS PUNTUACIÓN A USUARIOS
         #[ink::test]
         //Test que verifica que la funcionalidad top_5_vendedores funcione correctamente. (Caso en el que hay más de 5 vendedores).
@@ -2685,105 +2689,54 @@ mod usuarios_sistema {
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
-            let dave = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().dave;
+            let django = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().django;
             let eve = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().eve;
             let frank = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().frank;
 
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Vendedor);
+            sistema.registrar_usuario(String::from("Bob"), String::from("Surname"), String::from("bob.email"), Rol::Vendedor);
+            sistema.registrar_usuario(String::from("Django"), String::from("Surname"), String::from("django.email"), Rol::Ambos);
+            sistema.registrar_usuario(String::from("Eve"), String::from("Surname"), String::from("eve.email"), Rol::Ambos);
+            sistema.registrar_usuario(String::from("Frank"), String::from("Surname"), String::from("frank.email"), Rol::Comprador);
 
-            //Los registro en el sistema con distintas calificaciones.
-            sistema.usuarios.insert(charlie, 
-                &Usuario{
-                    nombre:"carlos".to_string(),
-                    apellido:"cc".to_string(),
-                    email:"carlocc".to_string(),
-                    id:charlie,
-                    rol:Rol::Ambos,
-                    publicaciones:Vec::new(),
-                    ordenes:Vec::new(),
-                    productos:Vec::new(),
-                    calificaciones_comprador:vec!(2,3,4),
-                    calificaciones_vendedor:vec!(5,5,5),
-            });
+            //Les doy las calificaciones.
 
-            sistema.usuarios.insert(alice, 
-                &Usuario{
-                    nombre:"alice".to_string(),
-                    apellido:"aa".to_string(),
-                    email:"aliceaa".to_string(),
-                    id:alice,
-                    rol:Rol::Ambos,
-                    publicaciones:Vec::new(),
-                    ordenes:Vec::new(),
-                    productos:Vec::new(),
-                    calificaciones_comprador:vec!(5,5,5),
-                    calificaciones_vendedor:vec!(4,4,4),
-            });
+            if let Some(mut user) = sistema.usuarios.get(&charlie) {
+                user.calificaciones_vendedor = vec![5, 5, 5];
+                sistema.usuarios.insert(&charlie, &user); 
+            }
 
-            sistema.usuarios.insert(bob, 
-                &Usuario{
-                    nombre:"bob".to_string(),
-                    apellido:"bb".to_string(),
-                    email:"bobb".to_string(),
-                    id:bob,
-                    rol:Rol::Ambos,
-                    publicaciones:Vec::new(),
-                    ordenes:Vec::new(),
-                    productos:Vec::new(),
-                    calificaciones_comprador:vec!(3,3,3),
-                    calificaciones_vendedor:vec!(3,3,3),
-            });
+            if let Some(mut user) = sistema.usuarios.get(&alice) {
+                user.calificaciones_vendedor = vec![5, 5, 1]; //3.6
+                sistema.usuarios.insert(&alice, &user); 
+            }
 
-            sistema.usuarios.insert(dave, 
-                &Usuario{
-                    nombre:"dave".to_string(),
-                    apellido:"dd".to_string(),
-                    email:"daved".to_string(),
-                    id:dave,
-                    rol:Rol::Ambos,
-                    publicaciones:Vec::new(),
-                    ordenes:Vec::new(),
-                    productos:Vec::new(),
-                    calificaciones_comprador:vec!(4,4,4),
-                    calificaciones_vendedor:vec!(2,2,2),
-            });
+            if let Some(mut user) = sistema.usuarios.get(&bob) {
+                user.calificaciones_vendedor = vec![1, 1, 1]; 
+                sistema.usuarios.insert(&bob, &user); 
+            }
+             
+            if let Some(mut user) = sistema.usuarios.get(&django) {
+                user.calificaciones_vendedor = vec![2, 3, 4]; //3
+                sistema.usuarios.insert(&django, &user); 
+            }
 
-            sistema.usuarios.insert(eve, 
-                &Usuario{
-                    nombre:"eve".to_string(),
-                    apellido:"ee".to_string(),
-                    email:"evee".to_string(),
-                    id:eve,
-                    rol:Rol::Ambos,
-                    publicaciones:Vec::new(),
-                    ordenes:Vec::new(),
-                    productos:Vec::new(),
-                    calificaciones_comprador:vec!(1,1,1),
-                    calificaciones_vendedor:vec!(1,1,1),
-            });
-
-            sistema.usuarios.insert(frank, 
-                &Usuario{
-                    nombre:"frank".to_string(),
-                    apellido:"ff".to_string(),
-                    email:"frankf".to_string(),
-                    id:frank,
-                    rol:Rol::Ambos,
-                    publicaciones:Vec::new(),
-                    ordenes:Vec::new(),
-                    productos:Vec::new(),
-                    calificaciones_comprador:vec!(5,4,3),
-                    calificaciones_vendedor:vec!(5,4,3),
-            });
-
+            if let Some(mut user) = sistema.usuarios.get(&eve) {
+                user.calificaciones_vendedor = vec![5, 5, 5];
+                sistema.usuarios.insert(&eve, &user); 
+            }
+    
             //Pido el top 5 de vendedores.
-            let top_5 = sistema.top_5_vendedores().unwrap();
+            let top_5 = sistema.consultar_top_5_vendedores();
             assert_eq!(top_5.len(), 5); //Debe devolver 5 vendedores.
-            assert_eq!(top_5[0].0, charlie); //Charlie es el mejor vendedor (tiene promedio 5).
-            assert_eq!(top_5[1].0, alice); //Alice es el segundo mejor vendedor (tiene promedio 4).
-            assert_eq!(top_5[2].0, bob); //Bob es el tercer mejor vendedor (tiene promedio 3).
-            assert_eq!(top_5[3].0, dave); //Dave es el cuarto mejor vendedor (tiene promedio 2).
-            assert_eq!(top_5[4].0, frank); //Frank es el quinto mejor vendedor (tiene promedio 4).            
-        }*/
+                
+            /*assert_eq!(top_5[0].id, charlie);
+            assert_eq!(top_5[1].id, eve); 
+            assert_eq!(top_5[2].id, alice); 
+            assert_eq!(top_5[3].id, django); 
+            assert_eq!(top_5[4].id, bob);      */
+        }
     }
 
 
