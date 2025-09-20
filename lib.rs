@@ -2754,6 +2754,59 @@ mod usuarios_sistema {
             assert_eq!(top_5[3].id, django); 
             assert_eq!(top_5[4].id, bob);      
         }
+
+        #[ink::test]
+        //Este test chequea que la funcionalidad top_5_vendedores funcione correctamente (Caso en el que no hay vendedores).
+        fn test_top_5_vendedores_nulo() {
+            let sistema = Sistema::new();
+            let top_5 = sistema.consultar_top_5_vendedores();
+            assert!(top_5.is_empty()); //Debe devolver un vector vacío.
+        }
+
+        #[ink::test]
+        //Este test chequea que la funcionalidad top_5_vendedores funcione correctamente (Caso en el que hay menos de 5 vendedores).
+        fn test_top_5_vendedores_menor_a_5() {
+            let mut sistema = Sistema::new();
+
+            //Preparo a los vendedores.
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Vendedor);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
+            sistema.registrar_usuario(String::from("Bob"), String::from("Surname"), String::from("bob.email"), Rol::Vendedor);
+
+            //Les doy las calificaciones.
+
+            if let Some(mut user) = sistema.usuarios.get(&charlie) {
+                user.calificaciones_vendedor = vec![5, 5, 5];
+                sistema.usuarios.insert(&charlie, &user); 
+            }
+
+            if let Some(mut user) = sistema.usuarios.get(&alice) {
+                user.calificaciones_vendedor = vec![5, 5, 1]; //3.6
+                sistema.usuarios.insert(&alice, &user); 
+            }
+
+            if let Some(mut user) = sistema.usuarios.get(&bob) {
+                user.calificaciones_vendedor = vec![1, 1, 1]; 
+                sistema.usuarios.insert(&bob, &user); 
+            }
+    
+            //Pido el top 5 de vendedores.
+            let top_5 = sistema.consultar_top_5_vendedores();
+            assert_eq!(top_5.len(), 3); //Debe devolver 3 vendedores (los únicos que hay).
+                
+
+            //Chequeo que estén ordenados correctamente (de mayor a menor puntuación) y que sean los correctos. 
+            assert_eq!(top_5[0].id, charlie);
+        }
     }
 
 
