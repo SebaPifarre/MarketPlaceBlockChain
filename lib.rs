@@ -1075,7 +1075,7 @@ mod usuarios_sistema {
             }
 
             //Ordeno el vector en cuanto reputación de forma descendente.
-            //vendedores.sort_by(|a, b| b.calcular_puntaje_como_vendedor().cmp(&a.calcular_puntaje_como_vendedor()));
+            vendedores.sort_by(|a, b| b.calcular_puntaje_como_vendedor().cmp(&a.calcular_puntaje_como_vendedor()));
 
             //Recorto el tamaño del vector a 5.
             //vendedores.truncate(5);
@@ -2742,11 +2742,13 @@ mod usuarios_sistema {
             let top_5 = sistema.consultar_top_5_vendedores();
             assert_eq!(top_5.len(), 5); //Debe devolver 5 vendedores.
                 
-            /*assert_eq!(top_5[0].id, charlie);
+
+            //Chequeo que el 
+            assert_eq!(top_5[0].id, charlie);
             assert_eq!(top_5[1].id, eve); 
             assert_eq!(top_5[2].id, alice); 
             assert_eq!(top_5[3].id, django); 
-            assert_eq!(top_5[4].id, bob);      */
+            assert_eq!(top_5[4].id, bob);      
         }
     }
 
