@@ -1081,6 +1081,50 @@ mod usuarios_sistema {
 
             vendedores
         }
+
+        #[ink(message)]
+        pub fn ver_productos_mas_vendidos(&self, categoria: Categoria) -> Vec<(u128, u8)> {
+            self._ver_productos_mas_vendidos(categoria)
+        }
+
+        fn _ver_productos_mas_vendidos(&self, categoria: Categoria) -> Vec<(u128, u8)> {
+            //Creo un vector para los productos.
+            let mut productos: Vec<(u128, u8)> = Vec::new();
+
+            //Recorro el vector de ordenes -> Voy chequeando la lista de productos y completo el vector según eso
+            for orden in &self.ordenes {
+
+                //Recorro la lista de productos de la orden.
+                for tupla in &orden.lista_productos {
+
+                    //Primero busco al producto en el mapping de productos del sistema (para ver su categoría).
+                    let producto = self.productos.get(tupla.0 as u128);
+
+                    if producto.is_none() {
+                        continue; //Si el producto no existe, paso al siguiente.
+                    }
+                    let producto = producto.unwrap();
+
+                    if producto.categoria == categoria {
+                        //Si ya existe en mi vector contador, aumento la cantidad de ventas del mismo.
+                        if let Some(pos) = productos.iter().position(|(p, _)| *p == tupla.0) { //Busco la posición del producto en el vector.
+                            //productos[pos].1 += tupla.1 as u8; //Aumento la cantidad de ventas del producto.
+                            productos[pos].1 = productos[pos].1.wrapping_add(tupla.1 as u8);
+                        } else { //Si no existe, lo agrego.
+                            productos.push((tupla.0.clone(), tupla.1.try_into().unwrap())); //Agrego el producto al vector.
+                        }
+                    }
+                }
+            }
+
+            //Ordeno el vector en cuanto cantidad de ventas de forma descendente.
+            productos.sort_by(|a, b| b.1.cmp(&a.1));
+
+            //Recorto el tamaño del vector a 10 (como máximo).
+            productos.truncate(10);
+
+            productos
+        }
     }
 
 
@@ -2807,6 +2851,67 @@ mod usuarios_sistema {
             //Chequeo que estén ordenados correctamente (de mayor a menor puntuación) y que sean los correctos. 
             assert_eq!(top_5[0].id, charlie);
         }
+
+        //-------------------------------------------------------------------------------------
+        //TESTS VER PRODUCTOS MÁS VENDIDOS.
+
+        #[ink::test]
+        fn test_productos_mas_vendidos() {
+            let mut sistema = Sistema::new();
+
+            //Preparo a los vendedores.
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Vendedor);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
+            sistema.registrar_usuario(String::from("Bob"), String::from("Surname"), String::from("bob.email"), Rol::Vendedor);
+
+            //Creo productos y publicaciones.
+            sistema.nuevo_producto("Cif".to_string(), "Cif".to_string(), Categoria::Limpieza); //ID 1
+            sistema.nuevo_producto("Remera".to_string(), "Remera".to_string(), Categoria::Ropa); //ID 2
+            sistema.nuevo_producto("Pantalon".to_string(), "Pantalon".to_string(), Categoria::Ropa); //ID 3
+            sistema.nuevo_producto("Arroz".to_string(), "Arroz".to_string(), Categoria::Otros); //ID 4
+
+            //Publicaciones de Charlie.
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.crear_publicacion(0, 100, 10); //Cif
+            sistema.crear_publicacion(1, 500, 20); //Remera
+
+            //Publicaciones de Alice.
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            sistema.crear_publicacion(1, 300, 15); //Remera
+            sistema.crear_publicacion(2, 200, 25); //Pantalon
+
+            //Publicaciones de Bob.
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
+            sistema.crear_publicacion(3, 400, 30); //Arroz
+            sistema.crear_publicacion(0, 150, 12); //Cif
+            sistema.crear_publicacion(2, 250, 18); //Pantalon
+
+            //Creo órdenes de compra para que haya ventas.
+            let django = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().django;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(django);
+            sistema.registrar_usuario(String::from("Django"), String::from("Surname"), String::from("django.email"), Rol::Ambos);
+            sistema.generar_orden_compra(vec![(0, 2), (1, 1)], 1000); //Compra 2 Cif y 1 Remera (de Charlie)
+            sistema.generar_orden_compra(vec![(1, 2), (2, 1)], 1000); //Compra 2 Remera y 1 Pantalon (de Alice)
+            sistema.generar_orden_compra(vec![(3, 3), (0, 1), (2, 2)], 1000); //Compra 3 Arroz, 1 Cif y 2 Pantalon (de Bob)
+
+
+            let productos_mas_vendidos = sistema.ver_productos_mas_vendidos(Categoria::Ropa);
+            //assert_eq!(productos_mas_vendidos.len(), 2); //Debe devolver 2 productos.
+            assert_eq!(productos_mas_vendidos[0].0, 2); //El producto más vendido es la Remera (ID 2).
+            assert_eq!(productos_mas_vendidos[0].1, 3); //Se vendieron 3 Remeras.
+            assert_eq!(productos_mas_vendidos[1].0, 3); //El segundo producto más vendido es el Pantalon (ID 3).
+            assert_eq!(productos_mas_vendidos[1].1, 3); //Se vendieron 3 Pantalones.
+        }
+
     }
 
 
