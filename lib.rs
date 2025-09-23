@@ -1066,20 +1066,30 @@ mod usuarios_sistema {
 
         fn calcular_puntaje_como_comprador(&self) -> u8 {
             if self.calificaciones_comprador.is_empty() {
-            return 0;
-        }
-        let sum: u32 = self.calificaciones_comprador.iter().map(|&x| x as u32).sum();
-        let avg = sum / self.calificaciones_comprador.len() as u32;
-        avg as u8
+                return 0;
+            }
+            let sum: u32 = self.calificaciones_comprador.iter().map(|&x| x as u32).sum();
+            let count = self.calificaciones_comprador.len() as u32;
+
+            // Usar checked_div para evitar división por cero
+            match sum.checked_div(count) {
+                Some(avg) => avg as u8,
+                None => 0, // En caso de que ocurra un error, aunque no debería
+            }
         }
 
         fn calcular_puntaje_como_vendedor(&self) -> u8 {
             if self.calificaciones_vendedor.is_empty() {
-            return 0;
-        }
-        let sum: u32 = self.calificaciones_vendedor.iter().map(|&x| x as u32).sum();
-        let avg = sum / self.calificaciones_vendedor.len() as u32;
-        avg as u8
+                return 0;
+            }
+            let sum: u32 = self.calificaciones_vendedor.iter().map(|&x| x as u32).sum();
+            let count = self.calificaciones_vendedor.len() as u32;
+
+            // idem comprador
+            match sum.checked_div(count) {
+                Some(avg) => avg as u8,
+                None => 0,
+            }
         }
     }
 
