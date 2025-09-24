@@ -2,10 +2,13 @@
 
 #[ink::contract]
 mod usuarios_sistema {
+
+
     use ink::prelude::{string::String};
     use ink::storage::Mapping;   
     use ink::prelude::vec::Vec;
     use ink::prelude::collections::BTreeSet;
+    use ink::prelude::collections::BTreeMap;
 
     #[ink(storage)]
 
@@ -152,6 +155,10 @@ mod usuarios_sistema {
         descripcion: String,
 
         categoria: Categoria,
+
+        puntuaciones: Vec<u8>,
+
+        total_ventas: u32,
     }
 
 
@@ -161,7 +168,7 @@ mod usuarios_sistema {
         feature = "std",
         derive(ink::storage::traits::StorageLayout)
     )]
-    #[derive(Clone, PartialEq, Eq, Debug)]
+    #[derive(Clone, PartialEq, Eq, Debug, Ord, PartialOrd)]
     pub enum Categoria {
         Limpieza,
         Tecnologia,
@@ -465,7 +472,10 @@ mod usuarios_sistema {
             self.productos.insert(id_producto.clone(), &Producto {
                 nombre,
                 descripcion,
-                categoria
+                categoria,
+                puntuaciones:Vec::<u8>::new(),
+                total_ventas:0,
+
             });
 
             // Agregar producto a lista personal del vendedor
@@ -827,7 +837,14 @@ mod usuarios_sistema {
                     return Err(ErrorSistema::OperacionNoValida)
                 } 
                 match &orden_acutal.estado {
-                    EstadoOrdenCompra::Enviado => Ok(orden_acutal.estado = EstadoOrdenCompra::Recibido),
+                    EstadoOrdenCompra::Enviado => {
+                        for (id_producto, cantidad) in &orden_acutal.lista_productos{
+                            let mut produc = self.productos.get(id_producto).unwrap();
+                            produc.total_ventas += cantidad;
+                            self.productos.insert(id_producto, &produc);
+                        }
+                        return Ok(orden_acutal.estado = EstadoOrdenCompra::Recibido);
+                    },
                     _ => return Err(ErrorSistema::OperacionNoValida),
                 }
                  
@@ -926,6 +943,16 @@ mod usuarios_sistema {
                                 user.calificaciones_vendedor.push(puntuacion);
                                 self.usuarios.insert(&orden.id_vendedor, &user);
                                 orden.puntuado_por_comprador = true;
+
+
+                                // Este for actualiza las puntuaciones por prodcuto de la lista
+                                for (id_producto, cantidad) in &orden.lista_productos {
+                                    let mut producto_actual = self.productos.get(id_producto).unwrap();
+                                    producto_actual.puntuaciones.push(puntuacion);
+                                    self.productos.insert(&id_producto, &producto_actual);
+                
+                                }
+
                                 return Ok(());
                             }
                         }
@@ -1082,6 +1109,32 @@ mod usuarios_sistema {
             vendedores
         }
 
+        //Consultar top 5 compradores con mejor reputación
+         #[ink(message)]
+        pub fn consultar_top_5_compradores(&self) -> Vec<Usuario> {
+            self._consultar_top_5_compradores()
+        }
+
+        fn _consultar_top_5_compradores(&self) -> Vec<Usuario> {
+            //Filtro los compradores recorriendo el vector de id_usuarios y buscando en el mapping.
+            let mut compradores: Vec<Usuario> = Vec::new(); //Creo un vector con los compradores.
+            for id in &self.id_usuarios {
+                if let Some(user) = self.usuarios.get(id) {
+                    if user.rol == Rol::Comprador || user.rol == Rol::Ambos {
+                        compradores.push(user);
+                    }
+                }
+            }
+
+            //Ordeno el vector en cuanto reputación de forma descendente.
+            compradores.sort_by(|a, b| b.calcular_puntaje_como_comprador().cmp(&a.calcular_puntaje_como_comprador()));
+
+            //Recorto el tamaño del vector a 5.
+            compradores.truncate(5);
+
+            compradores
+        }
+
         #[ink(message)]
         pub fn ver_productos_mas_vendidos(&self, categoria: Categoria) -> Vec<(u128, u8)> {
             self._ver_productos_mas_vendidos(categoria)
@@ -1124,6 +1177,49 @@ mod usuarios_sistema {
             productos.truncate(10);
 
             productos
+        }
+
+        #[ink(message)]
+        pub fn estadisticas_por_categoria(&self) -> Vec<(Categoria, u32, u8)> {
+            self._estadisticas_por_categoria()
+        }
+
+        fn _estadisticas_por_categoria(&self) -> Vec<(Categoria, u32, u8)>{
+
+            let mut ventas_por_categoria: BTreeMap<Categoria, u32> = BTreeMap::new();
+            let mut suma_puntajes: BTreeMap<Categoria, u8> = BTreeMap::new();
+            let mut cantidad_puntajes: BTreeMap<Categoria, u8> = BTreeMap::new();
+
+            // Recorremos todos los productos
+            let mut id:u128 = 0;
+            while id < self.proximo_id_producto {
+                if let Some(producto) = self.productos.get(&id) {
+                    // Acumular ventas
+                    *ventas_por_categoria.entry(producto.categoria.clone()).or_insert(0) += producto.total_ventas;
+
+                    // Acumular puntuaciones
+                    let suma: u8 = producto.puntuaciones.iter().map(|&x| x as u8).sum();
+                    let cantidad = producto.puntuaciones.len() as u8;
+                    *suma_puntajes.entry(producto.categoria.clone()).or_insert(0) += suma;
+                    *cantidad_puntajes.entry(producto.categoria.clone()).or_insert(0) += cantidad;
+                }
+                id += 1;
+            }
+
+            // Construir el resultado
+            let mut resultado = Vec::new();
+            for categoria in ventas_por_categoria.keys() {
+                let ventas = *ventas_por_categoria.get(categoria).unwrap_or(&0);
+                let suma = *suma_puntajes.get(categoria).unwrap_or(&0);
+                let cantidad = *cantidad_puntajes.get(categoria).unwrap_or(&0);
+                let promedio = if cantidad > 0 {
+                    suma  / cantidad 
+                } else {
+                    0
+                };
+                resultado.push((categoria.clone(), ventas, promedio));
+            }
+            resultado
         }
     }
 
@@ -1188,14 +1284,13 @@ mod usuarios_sistema {
             }
         }
 
-    
+        
 
     /// Unit tests in Rust are normally defined within such a `#[cfg(test)]`
     /// module and test functions are marked with a `#[test]` attribute.
     /// The below code is technically just normal Rust code.
     #[cfg(test)]
     mod tests {
-        use core::f32::consts::E;
 
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
@@ -2258,6 +2353,14 @@ mod usuarios_sistema {
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
 
+            sistema.productos.insert(1, &Producto{
+                nombre: "test".to_string(),
+                descripcion: "otro test".to_string(),
+                categoria:Categoria::Calzado,
+                puntuaciones: Vec::<u8>::new(),
+                total_ventas:0,
+            });
+
             sistema.ordenes.push(
                 OrdenCompra {
                     lista_productos: vec!((1,1)),
@@ -2911,6 +3014,103 @@ mod usuarios_sistema {
             assert_eq!(productos_mas_vendidos[1].0, 3); //El segundo producto más vendido es el Pantalon (ID 3).
             assert_eq!(productos_mas_vendidos[1].1, 3); //Se vendieron 3 Pantalones.
         }*/
+
+        //-------------------------------------------------------------------------------------
+        //TESTS PARA ESTADISTICAS POR CATEGORIA
+
+        #[ink::test]
+        fn test_estadisticas_por_categorias() {
+            let mut sistema = Sistema::new();
+            sistema.productos.insert(0, &Producto{
+                nombre:"remera".to_string(),
+                descripcion:"negra".to_string(),
+                categoria:Categoria::Ropa,
+                puntuaciones:vec![1,2,3],
+                total_ventas:23,
+            });
+
+            sistema.productos.insert(1, &Producto{
+                nombre:"pantalon".to_string(),
+                descripcion:"azul".to_string(),
+                categoria:Categoria::Ropa,
+                puntuaciones:vec![4,4],
+                total_ventas:12,
+            });
+
+            sistema.productos.insert(2, &Producto{
+                nombre:"Auriculares".to_string(),
+                descripcion:"XYZ".to_string(),
+                categoria:Categoria::Tecnologia,
+                puntuaciones:vec![3,2],
+                total_ventas:100,
+            });
+
+            sistema.proximo_id_producto = 3;
+
+            assert_eq!(sistema.estadisticas_por_categoria(), vec![(Categoria::Tecnologia, 100, 2), (Categoria::Ropa, 35, 2)]);
+        }
+
+        //-------------------------------------------------------------------------------------
+        //TESTS PARA TOP 5 COMPRADORES
+
+        #[ink::test]
+        fn test_top_5_compradores() {
+            let mut sistema = Sistema::new();
+
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+
+            sistema.usuarios.insert(charlie, &Usuario{
+                nombre:"charlie".to_string(),
+                apellido:"char".to_string(),
+                email:"ch@".to_string(),
+                id:charlie,
+                rol:Rol::Comprador,
+                publicaciones: Vec::new(),
+                ordenes: Vec::new(),
+                productos: Vec::new(),
+                calificaciones_comprador: vec![1,2,3],
+                calificaciones_vendedor: Vec::new(),
+            });
+
+            sistema.usuarios.insert(alice, &Usuario{
+                nombre:"alice".to_string(),
+                apellido:"alice".to_string(),
+                email:"alice@".to_string(),
+                id:alice,
+                rol:Rol::Ambos,
+                publicaciones: Vec::new(),
+                ordenes: Vec::new(),
+                productos: Vec::new(),
+                calificaciones_comprador: vec![5,4,3],
+                calificaciones_vendedor: Vec::new(),
+            });
+
+            sistema.usuarios.insert(bob, &Usuario{
+                nombre:"bob".to_string(),
+                apellido:"bob".to_string(),
+                email:"bob@".to_string(),
+                id:bob,
+                rol:Rol::Ambos,
+                publicaciones: Vec::new(),
+                ordenes: Vec::new(),
+                productos: Vec::new(),
+                calificaciones_comprador: vec![5,5],
+                calificaciones_vendedor: Vec::new(),
+            });
+
+            sistema.id_usuarios.push(charlie);
+            sistema.id_usuarios.push(alice);
+            sistema.id_usuarios.push(bob);
+
+            assert_eq!(sistema.consultar_top_5_compradores()[0].id, bob);
+
+            assert_eq!(sistema.consultar_top_5_compradores()[1].id, alice);
+
+            assert_eq!(sistema.consultar_top_5_compradores()[2].id, charlie);
+            
+        }
 
     }
 
