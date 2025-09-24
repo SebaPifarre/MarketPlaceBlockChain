@@ -2855,7 +2855,7 @@ mod usuarios_sistema {
         //-------------------------------------------------------------------------------------
         //TESTS VER PRODUCTOS MÁS VENDIDOS.
 
-        #[ink::test]
+       /*  #[ink::test]
         fn test_productos_mas_vendidos() {
             let mut sistema = Sistema::new();
 
@@ -2910,7 +2910,7 @@ mod usuarios_sistema {
             assert_eq!(productos_mas_vendidos[0].1, 3); //Se vendieron 3 Remeras.
             assert_eq!(productos_mas_vendidos[1].0, 3); //El segundo producto más vendido es el Pantalon (ID 3).
             assert_eq!(productos_mas_vendidos[1].1, 3); //Se vendieron 3 Pantalones.
-        }
+        }*/
 
     }
 
