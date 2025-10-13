@@ -7,10 +7,13 @@ pub use self::usuarios_sistema::{
 
 #[ink::contract]
 mod usuarios_sistema {
+
+
     use ink::prelude::{string::String};
     use ink::storage::Mapping;   
     use ink::prelude::vec::Vec;
     use ink::prelude::collections::BTreeSet;
+    use ink::prelude::collections::BTreeMap;
 
     #[ink(storage)]
 
@@ -36,6 +39,7 @@ mod usuarios_sistema {
     /// ```
     pub struct Sistema {
         usuarios: ink::storage::Mapping<AccountId, Usuario>,
+        id_usuarios: Vec<AccountId>,
         publicaciones: Vec<Publicacion>,
         productos: Mapping<u128, Producto>,
         ordenes: Vec<OrdenCompra>,
@@ -156,6 +160,10 @@ mod usuarios_sistema {
         descripcion: String,
 
         categoria: Categoria,
+
+        puntuaciones: Vec<u8>,
+
+        total_ventas: u32,
     }
 
 
@@ -165,7 +173,7 @@ mod usuarios_sistema {
         feature = "std",
         derive(ink::storage::traits::StorageLayout)
     )]
-    #[derive(Clone, PartialEq, Eq, Debug)]
+    #[derive(Clone, PartialEq, Eq, Debug, Ord, PartialOrd)]
     pub enum Categoria {
         Limpieza,
         Tecnologia,
@@ -275,7 +283,7 @@ mod usuarios_sistema {
         /// ```
         #[ink(constructor)]
         pub fn new() -> Self {
-            Self {  usuarios: Mapping::new(), publicaciones: Vec::<Publicacion>::new(), productos: Mapping::new(), ordenes:Vec::new(), proximo_id_publicacion: 0, proximo_id_producto: 0 , proximo_id_orden: 0}
+            Self {id_usuarios: Vec::<AccountId>::new(),  usuarios: Mapping::new(), publicaciones: Vec::<Publicacion>::new(), productos: Mapping::new(), ordenes:Vec::new(), proximo_id_publicacion: 0, proximo_id_producto: 0 , proximo_id_orden: 0}
         }
 
 
@@ -384,6 +392,10 @@ mod usuarios_sistema {
             }                
             
             self.usuarios.insert(id, &Usuario {nombre, apellido, email, id, rol, publicaciones: Vec::<u128>::new(), ordenes: Vec::<u128>::new(), productos: Vec::<u128>::new(), calificaciones_comprador: Vec::<u8>::new(), calificaciones_vendedor: Vec::<u8>::new()});
+            
+            //Agrego el id al vector id_usuarios.
+            self.id_usuarios.push(id);
+
             Ok(())
         }
 
@@ -465,7 +477,10 @@ mod usuarios_sistema {
             self.productos.insert(id_producto.clone(), &Producto {
                 nombre,
                 descripcion,
-                categoria
+                categoria,
+                puntuaciones:Vec::<u8>::new(),
+                total_ventas:0,
+
             });
 
             // Agregar producto a lista personal del vendedor
@@ -827,7 +842,14 @@ mod usuarios_sistema {
                     return Err(ErrorSistema::OperacionNoValida)
                 } 
                 match &orden_acutal.estado {
-                    EstadoOrdenCompra::Enviado => Ok(orden_acutal.estado = EstadoOrdenCompra::Recibido),
+                    EstadoOrdenCompra::Enviado => {
+                        for (id_producto, cantidad) in &orden_acutal.lista_productos{
+                            let mut produc = self.productos.get(id_producto).unwrap();
+                            produc.total_ventas += cantidad;
+                            self.productos.insert(id_producto, &produc);
+                        }
+                        return Ok(orden_acutal.estado = EstadoOrdenCompra::Recibido);
+                    },
                     _ => return Err(ErrorSistema::OperacionNoValida),
                 }
                  
@@ -926,6 +948,16 @@ mod usuarios_sistema {
                                 user.calificaciones_vendedor.push(puntuacion);
                                 self.usuarios.insert(&orden.id_vendedor, &user);
                                 orden.puntuado_por_comprador = true;
+
+
+                                // Este for actualiza las puntuaciones por prodcuto de la lista
+                                for (id_producto, cantidad) in &orden.lista_productos {
+                                    let mut producto_actual = self.productos.get(id_producto).unwrap();
+                                    producto_actual.puntuaciones.push(puntuacion);
+                                    self.productos.insert(&id_producto, &producto_actual);
+                
+                                }
+
                                 return Ok(());
                             }
                         }
@@ -1055,7 +1087,147 @@ mod usuarios_sistema {
             mis_ordenes
         }
 
+        //LAS SIGUIENTES FUNCIONES SON PARTE DEL CONTRATO 2. CORRER EN EL FUTURO (ESPACIO TEMPORAL)
+        //Consultar top 5 vendedores con mejor reputación
+         #[ink(message)]
+        pub fn consultar_top_5_vendedores(&self) -> Vec<Usuario> {
+            self._consultar_top_5_vendedores()
+        }
+
+        fn _consultar_top_5_vendedores(&self) -> Vec<Usuario> {
+            //Filtro los vendedores recorriendo el vector de id_usuarios y buscando en el mapping.
+            let mut vendedores: Vec<Usuario> = Vec::new(); //Creo un vector con los vendedores.
+            for id in &self.id_usuarios {
+                if let Some(user) = self.usuarios.get(id) {
+                    if user.rol == Rol::Vendedor || user.rol == Rol::Ambos {
+                        vendedores.push(user);
+                    }
+                }
+            }
+
+            //Ordeno el vector en cuanto reputación de forma descendente.
+            vendedores.sort_by(|a, b| b.calcular_puntaje_como_vendedor().cmp(&a.calcular_puntaje_como_vendedor()));
+
+            //Recorto el tamaño del vector a 5.
+            vendedores.truncate(5);
+
+            vendedores
+        }
+
+        //Consultar top 5 compradores con mejor reputación
+         #[ink(message)]
+        pub fn consultar_top_5_compradores(&self) -> Vec<Usuario> {
+            self._consultar_top_5_compradores()
+        }
+
+        fn _consultar_top_5_compradores(&self) -> Vec<Usuario> {
+            //Filtro los compradores recorriendo el vector de id_usuarios y buscando en el mapping.
+            let mut compradores: Vec<Usuario> = Vec::new(); //Creo un vector con los compradores.
+            for id in &self.id_usuarios {
+                if let Some(user) = self.usuarios.get(id) {
+                    if user.rol == Rol::Comprador || user.rol == Rol::Ambos {
+                        compradores.push(user);
+                    }
+                }
+            }
+
+            //Ordeno el vector en cuanto reputación de forma descendente.
+            compradores.sort_by(|a, b| b.calcular_puntaje_como_comprador().cmp(&a.calcular_puntaje_como_comprador()));
+
+            //Recorto el tamaño del vector a 5.
+            compradores.truncate(5);
+
+            compradores
+        }
+
+        #[ink(message)]
+        pub fn ver_productos_mas_vendidos(&self, categoria: Categoria) -> Vec<(u128, u8)> {
+            self._ver_productos_mas_vendidos(categoria)
+        }
+
+        fn _ver_productos_mas_vendidos(&self, categoria: Categoria) -> Vec<(u128, u8)> {
+            //Creo un vector para los productos.
+            let mut productos: Vec<(u128, u8)> = Vec::new();
+
+            //Recorro el vector de ordenes -> Voy chequeando la lista de productos y completo el vector según eso
+            for orden in &self.ordenes {
+
+                //Recorro la lista de productos de la orden.
+                for tupla in &orden.lista_productos {
+
+                    //Primero busco al producto en el mapping de productos del sistema (para ver su categoría).
+                    let producto = self.productos.get(tupla.0 as u128);
+
+                    if producto.is_none() {
+                        continue; //Si el producto no existe, paso al siguiente.
+                    }
+                    let producto = producto.unwrap();
+
+                    if producto.categoria == categoria {
+                        //Si ya existe en mi vector contador, aumento la cantidad de ventas del mismo.
+                        if let Some(pos) = productos.iter().position(|(p, _)| *p == tupla.0) { //Busco la posición del producto en el vector.
+                            //productos[pos].1 += tupla.1 as u8; //Aumento la cantidad de ventas del producto.
+                            productos[pos].1 = productos[pos].1.wrapping_add(tupla.1 as u8);
+                        } else { //Si no existe, lo agrego.
+                            productos.push((tupla.0.clone(), tupla.1.try_into().unwrap())); //Agrego el producto al vector.
+                        }
+                    }
+                }
+            }
+
+            //Ordeno el vector en cuanto cantidad de ventas de forma descendente.
+            productos.sort_by(|a, b| b.1.cmp(&a.1));
+
+            //Recorto el tamaño del vector a 10 (como máximo).
+            productos.truncate(10);
+
+            productos
+        }
+
+        #[ink(message)]
+        pub fn estadisticas_por_categoria(&self) -> Vec<(Categoria, u32, u8)> { 
+            self._estadisticas_por_categoria()
+        }
+
+        fn _estadisticas_por_categoria(&self) -> Vec<(Categoria, u32, u8)>{
+
+            let mut ventas_por_categoria: BTreeMap<Categoria, u32> = BTreeMap::new();
+            let mut suma_puntajes: BTreeMap<Categoria, u8> = BTreeMap::new();
+            let mut cantidad_puntajes: BTreeMap<Categoria, u8> = BTreeMap::new();
+
+            // Recorremos todos los productos
+            let mut id:u128 = 0;
+            while id < self.proximo_id_producto {
+                if let Some(producto) = self.productos.get(&id) {
+                    // Acumular ventas
+                    *ventas_por_categoria.entry(producto.categoria.clone()).or_insert(0) += producto.total_ventas;
+
+                    // Acumular puntuaciones
+                    let suma: u8 = producto.puntuaciones.iter().map(|&x| x as u8).sum();
+                    let cantidad = producto.puntuaciones.len() as u8;
+                    *suma_puntajes.entry(producto.categoria.clone()).or_insert(0) += suma;
+                    *cantidad_puntajes.entry(producto.categoria.clone()).or_insert(0) += cantidad;
+                }
+                id += 1;
+            }
+
+            // Construir el resultado
+            let mut resultado = Vec::new();
+            for categoria in ventas_por_categoria.keys() {
+                let ventas = *ventas_por_categoria.get(categoria).unwrap_or(&0);
+                let suma = *suma_puntajes.get(categoria).unwrap_or(&0);
+                let cantidad = *cantidad_puntajes.get(categoria).unwrap_or(&0);
+                let promedio = if cantidad > 0 {
+                    suma  / cantidad 
+                } else {
+                    0
+                };
+                resultado.push((categoria.clone(), ventas, promedio));
+            }
+            resultado
+        }
     }
+
 
     impl Usuario {
         pub fn agregar_rol(&mut self, rol: Rol) -> Result<(), ErrorSistema> { 
@@ -1115,14 +1287,13 @@ mod usuarios_sistema {
             }
         }
 
-    
+        
 
     /// Unit tests in Rust are normally defined within such a `#[cfg(test)]`
     /// module and test functions are marked with a `#[test]` attribute.
     /// The below code is technically just normal Rust code.
     #[cfg(test)]
     mod tests {
-        use core::f32::consts::E;
 
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
@@ -2185,6 +2356,14 @@ mod usuarios_sistema {
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
 
+            sistema.productos.insert(1, &Producto{
+                nombre: "test".to_string(),
+                descripcion: "otro test".to_string(),
+                categoria:Categoria::Calzado,
+                puntuaciones: Vec::<u8>::new(),
+                total_ventas:0,
+            });
+
             sistema.ordenes.push(
                 OrdenCompra {
                     lista_productos: vec!((1,1)),
@@ -2622,7 +2801,339 @@ mod usuarios_sistema {
         }
 
         //-------------------------------------------------------------------------------------
+        //COSAS DE MI PT DEL SEGUNDO CONTRATO
+
+        //-------------------------------------------------------------------------------------
+        //TEST ID USUARIOS
+
+        #[ink::test]
+        //Test que verifica que los IDs de los usuarios se agregan correctamente al vector de IDs.
+        fn agregar_id_okay() {
+            let mut sistema = Sistema::new();
+
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+
+            assert!(sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos).is_ok());
+            assert_eq!(sistema.id_usuarios.len(), 1); //Debe tener un ID.
+            assert_eq!(sistema.id_usuarios[0], charlie); //El ID debe ser el de Charlie.
+        }
+
+        #[ink::test]
+        //Test que verifica que el vector de ids de usuarios está vecío cuando no hay nada.
+        fn ids_vacio_okay() {
+            let sistema = Sistema::new();
+            assert!(sistema.id_usuarios.is_empty()); //El vector de IDs debe estar vacío.
+        }
+
+
+
+        //TESTS PUNTUACIÓN A USUARIOS
+        #[ink::test]
+        //Test que verifica que la funcionalidad top_5_vendedores funcione correctamente. (Caso en el que hay más de 5 vendedores).
+        fn test_top_5_vendedores_okay() {
+            let mut sistema = Sistema::new();
+
+            //Preparo a los vendedores.
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+            let django = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().django;
+            let eve = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().eve;
+            let frank = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().frank;
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Vendedor);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
+            sistema.registrar_usuario(String::from("Bob"), String::from("Surname"), String::from("bob.email"), Rol::Vendedor);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(django);
+            sistema.registrar_usuario(String::from("Django"), String::from("Surname"), String::from("django.email"), Rol::Ambos);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(eve);
+            sistema.registrar_usuario(String::from("Eve"), String::from("Surname"), String::from("eve.email"), Rol::Ambos);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(frank);
+            sistema.registrar_usuario(String::from("Frank"), String::from("Surname"), String::from("frank.email"), Rol::Ambos);
+
+            //Les doy las calificaciones.
+
+            if let Some(mut user) = sistema.usuarios.get(&charlie) {
+                user.calificaciones_vendedor = vec![5, 5, 5];
+                sistema.usuarios.insert(&charlie, &user); 
+            }
+
+            if let Some(mut user) = sistema.usuarios.get(&alice) {
+                user.calificaciones_vendedor = vec![5, 5, 1]; //3.6
+                sistema.usuarios.insert(&alice, &user); 
+            }
+
+            if let Some(mut user) = sistema.usuarios.get(&bob) {
+                user.calificaciones_vendedor = vec![1, 1, 1]; 
+                sistema.usuarios.insert(&bob, &user); 
+            }
+             
+            if let Some(mut user) = sistema.usuarios.get(&django) {
+                user.calificaciones_vendedor = vec![2, 3, 4]; //3
+                sistema.usuarios.insert(&django, &user); 
+            }
+
+            if let Some(mut user) = sistema.usuarios.get(&eve) {
+                user.calificaciones_vendedor = vec![5, 5, 5];
+                sistema.usuarios.insert(&eve, &user); 
+            }
+
+            if let Some(mut user) = sistema.usuarios.get(&frank) {
+                user.calificaciones_vendedor = vec![0, 0, 0];
+                sistema.usuarios.insert(&frank, &user); 
+            }
+    
+            //Pido el top 5 de vendedores.
+            let top_5 = sistema.consultar_top_5_vendedores();
+            assert_eq!(top_5.len(), 5); //Debe devolver 5 vendedores.
+                
+
+            //Chequeo que estén ordenados correctamente (de mayor a menor puntuación) y que sean los correctos. 
+            assert_eq!(top_5[0].id, charlie);
+            assert_eq!(top_5[1].id, eve); 
+            assert_eq!(top_5[2].id, alice); 
+            assert_eq!(top_5[3].id, django); 
+            assert_eq!(top_5[4].id, bob);      
+        }
+
+        #[ink::test]
+        //Este test chequea que la funcionalidad top_5_vendedores funcione correctamente (Caso en el que no hay vendedores).
+        fn test_top_5_vendedores_nulo() {
+            let sistema = Sistema::new();
+            let top_5 = sistema.consultar_top_5_vendedores();
+            assert!(top_5.is_empty()); //Debe devolver un vector vacío.
+        }
+
+        #[ink::test]
+        //Este test chequea que la funcionalidad top_5_vendedores funcione correctamente (Caso en el que hay menos de 5 vendedores).
+        fn test_top_5_vendedores_menor_a_5() {
+            let mut sistema = Sistema::new();
+
+            //Preparo a los vendedores.
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Ambos);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Vendedor);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
+            sistema.registrar_usuario(String::from("Bob"), String::from("Surname"), String::from("bob.email"), Rol::Vendedor);
+
+            //Les doy las calificaciones.
+
+            if let Some(mut user) = sistema.usuarios.get(&charlie) {
+                user.calificaciones_vendedor = vec![5, 5, 5];
+                sistema.usuarios.insert(&charlie, &user); 
+            }
+
+            if let Some(mut user) = sistema.usuarios.get(&alice) {
+                user.calificaciones_vendedor = vec![5, 5, 1]; //3.6
+                sistema.usuarios.insert(&alice, &user); 
+            }
+
+            if let Some(mut user) = sistema.usuarios.get(&bob) {
+                user.calificaciones_vendedor = vec![1, 1, 1]; 
+                sistema.usuarios.insert(&bob, &user); 
+            }
+    
+            //Pido el top 5 de vendedores.
+            let top_5 = sistema.consultar_top_5_vendedores();
+            assert_eq!(top_5.len(), 3); //Debe devolver 3 vendedores (los únicos que hay).
+                
+
+            //Chequeo que estén ordenados correctamente (de mayor a menor puntuación) y que sean los correctos. 
+            assert_eq!(top_5[0].id, charlie);
+        }
+
+        //-------------------------------------------------------------------------------------
+        //TESTS VER PRODUCTOS MÁS VENDIDOS.
+
+         #[ink::test]
+        fn test_productos_mas_vendidos() {
+            let mut sistema = Sistema::new();
+
+            //Preparo a los vendedores.
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
+            sistema.registrar_usuario(String::from("Bob"), String::from("Surname"), String::from("bob.email"), Rol::Vendedor);
+
+            //Creo productos y publicaciones.
+            sistema.nuevo_producto("Cif".to_string(), "Cif".to_string(), Categoria::Limpieza); //ID 0
+            sistema.nuevo_producto("Remera".to_string(), "Remera".to_string(), Categoria::Ropa); //ID 1
+            sistema.nuevo_producto("Pantalon".to_string(), "Pantalon".to_string(), Categoria::Ropa); //ID 2
+            sistema.nuevo_producto("Arroz".to_string(), "Arroz".to_string(), Categoria::Otros); //ID 3
+
+            sistema.crear_publicacion(0, 100, 10); //Cif
+            sistema.crear_publicacion(1, 500, 20); //Remera
+            sistema.crear_publicacion(2, 200, 25); //Pantalon
+            sistema.crear_publicacion(3, 400, 30); //Arroz
+
+            //Creo órdenes de compra para que haya ventas.
+            let django = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().django;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(django);
+            sistema.registrar_usuario(String::from("Django"), String::from("Surname"), String::from("django.email"), Rol::Ambos);
+            //Id publicación, cantidad.
+            sistema.generar_orden_compra(vec![(0, 2), (1, 1)], 10000); //Compra 2 Cif y 1 Remera 
+            sistema.generar_orden_compra(vec![(1, 3), (2, 1)], 10000); //Compra 2 Remera y 1 Pantalon 
+            sistema.generar_orden_compra(vec![(3, 3), (0, 1), (2, 2)], 10000); //Compra 3 Arroz, 1 Cif y 2 Pantalon 
+
+
+            let productos_mas_vendidos = sistema.ver_productos_mas_vendidos(Categoria::Ropa);
+            assert_eq!(productos_mas_vendidos.len(), 2); //Debe devolver 2 productos.
+            assert_eq!(productos_mas_vendidos[0].0, 1); //El producto más vendido es la Remera (ID 1).
+            assert_eq!(productos_mas_vendidos[0].1, 4); //Se vendieron 4 Remeras.
+            
+            assert_eq!(productos_mas_vendidos[1].0, 2); //El segundo producto más vendido es el Pantalon (ID 2). 
+            assert_eq!(productos_mas_vendidos[1].1, 3); //Se vendieron 3 Pantalones.
+        }
+
+
+        #[ink::test]
+        fn test_productos_mas_vendidos_vacio() {
+
+            let mut sistema = Sistema::new();
+
+            //Preparo a los vendedores.
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
+            sistema.registrar_usuario(String::from("Bob"), String::from("Surname"), String::from("bob.email"), Rol::Vendedor);
+
+            //Creo productos y publicaciones.
+            sistema.nuevo_producto("Cif".to_string(), "Cif".to_string(), Categoria::Limpieza); //ID 0
+            sistema.nuevo_producto("Remera".to_string(), "Remera".to_string(), Categoria::Ropa); //ID 1
+            sistema.nuevo_producto("Pantalon".to_string(), "Pantalon".to_string(), Categoria::Ropa); //ID 2
+            sistema.nuevo_producto("Arroz".to_string(), "Arroz".to_string(), Categoria::Otros); //ID 3
+
+            sistema.crear_publicacion(0, 100, 10); //Cif
+            sistema.crear_publicacion(1, 500, 20); //Remera
+            sistema.crear_publicacion(2, 200, 25); //Pantalon
+            sistema.crear_publicacion(3, 400, 30); //Arroz
+
+            //Creo órdenes de compra para que haya ventas.
+            let django = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().django;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(django);
+            sistema.registrar_usuario(String::from("Django"), String::from("Surname"), String::from("django.email"), Rol::Ambos);
+            //Id publicación, cantidad.
+            sistema.generar_orden_compra(vec![(0, 2), (1, 1)], 10000); //Compra 2 Cif y 1 Remera 
+            sistema.generar_orden_compra(vec![(1, 3), (2, 1)], 10000); //Compra 2 Remera y 1 Pantalon 
+            sistema.generar_orden_compra(vec![(3, 3), (0, 1), (2, 2)], 10000); //Compra 3 Arroz, 1 Cif y 2 Pantalon 
+
+            let productos_mas_vendidos = sistema.ver_productos_mas_vendidos(Categoria::Musica);
+            assert_eq!(productos_mas_vendidos.len(), 0); //Debe devolver 2 productos.
+        }
+
+        //-------------------------------------------------------------------------------------
+        //TESTS PARA ESTADISTICAS POR CATEGORIA
+
+        #[ink::test]
+        fn test_estadisticas_por_categorias() {
+            let mut sistema = Sistema::new();
+            sistema.productos.insert(0, &Producto{
+                nombre:"remera".to_string(),
+                descripcion:"negra".to_string(),
+                categoria:Categoria::Ropa,
+                puntuaciones:vec![1,2,3],
+                total_ventas:23,
+            });
+
+            sistema.productos.insert(1, &Producto{
+                nombre:"pantalon".to_string(),
+                descripcion:"azul".to_string(),
+                categoria:Categoria::Ropa,
+                puntuaciones:vec![4,4],
+                total_ventas:12,
+            });
+
+            sistema.productos.insert(2, &Producto{
+                nombre:"Auriculares".to_string(),
+                descripcion:"XYZ".to_string(),
+                categoria:Categoria::Tecnologia,
+                puntuaciones:vec![3,2],
+                total_ventas:100,
+            });
+
+            sistema.proximo_id_producto = 3;
+
+            assert_eq!(sistema.estadisticas_por_categoria(), vec![(Categoria::Tecnologia, 100, 2), (Categoria::Ropa, 35, 2)]);
+        }
+
+        //-------------------------------------------------------------------------------------
+        //TESTS PARA TOP 5 COMPRADORES
+
+        #[ink::test]
+        fn test_top_5_compradores() {
+            let mut sistema = Sistema::new();
+
+            let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+
+            sistema.usuarios.insert(charlie, &Usuario{
+                nombre:"charlie".to_string(),
+                apellido:"char".to_string(),
+                email:"ch@".to_string(),
+                id:charlie,
+                rol:Rol::Comprador,
+                publicaciones: Vec::new(),
+                ordenes: Vec::new(),
+                productos: Vec::new(),
+                calificaciones_comprador: vec![1,2,3],
+                calificaciones_vendedor: Vec::new(),
+            });
+
+            sistema.usuarios.insert(alice, &Usuario{
+                nombre:"alice".to_string(),
+                apellido:"alice".to_string(),
+                email:"alice@".to_string(),
+                id:alice,
+                rol:Rol::Ambos,
+                publicaciones: Vec::new(),
+                ordenes: Vec::new(),
+                productos: Vec::new(),
+                calificaciones_comprador: vec![5,4,3],
+                calificaciones_vendedor: Vec::new(),
+            });
+
+            sistema.usuarios.insert(bob, &Usuario{
+                nombre:"bob".to_string(),
+                apellido:"bob".to_string(),
+                email:"bob@".to_string(),
+                id:bob,
+                rol:Rol::Ambos,
+                publicaciones: Vec::new(),
+                ordenes: Vec::new(),
+                productos: Vec::new(),
+                calificaciones_comprador: vec![5,5],
+                calificaciones_vendedor: Vec::new(),
+            });
+
+            sistema.id_usuarios.push(charlie);
+            sistema.id_usuarios.push(alice);
+            sistema.id_usuarios.push(bob);
+
+            assert_eq!(sistema.consultar_top_5_compradores()[0].id, bob);
+
+            assert_eq!(sistema.consultar_top_5_compradores()[1].id, alice);
+
+            assert_eq!(sistema.consultar_top_5_compradores()[2].id, charlie);
+            
+        }
+
     }
+}
 
 
     /// This is how you'd write end-to-end (E2E) or integration tests for ink! contracts.
@@ -2695,4 +3206,5 @@ mod usuarios_sistema {
             Ok(())
         }
     }
-}
+
+
