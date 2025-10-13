@@ -1,6 +1,26 @@
 # Trabajo Práctico Final – Marketplace Descentralizado tipo MercadoLibre (grupo 1)
 
-Primera entrega del grupo 1 del seminario Rust 2025 en virtud [del enunciado del trabajo práctico final](https://gist.github.com/EmaBord/980947ecc7924dd68c985e89c05916c2).
+Proyecto del grupo 1 para el seminario Rust 2025. [Enunciado](https://gist.github.com/EmaBord/980947ecc7924dd68c985e89c05916c2).
+
+## Segunda entrega
+
+### Marketplace
+
+Address: pendiente de despliegue
+
+Code hash: pendiente de despliegue
+
+Contract hash: pendiente de despliegue
+
+### ReportesView
+
+Address: pendiente de despliegue
+
+Code hash: pendiente de despliegue
+
+Contract hash: pendiente de despliegue
+
+## Primera entrega (Marketplace)
 
 Address: XidV7PdUSfKaxX5V27StDY3MZG4x5TRcCMJaJF783kwsKrc
 
@@ -114,5 +134,9 @@ El contrato `Sistema` ofrece las siguientes funcionalidades (mensajes de contrat
 ## Ejecución de tests
 Con el comando **`cargo test --lib`**.
 
-## Compilación del contrato
-Con **`cargo +nightly-2024-05-20 contract build`**.
+## Compilación
+**`./build.sh`** para ambos contratos.
+
+O compilar individualmente:
+- **`./build.sh marketplace`**
+- **`./build.sh reportes`**

@@ -25,10 +25,6 @@ mod ReportesView {
             Self { marketplace }
         }
 
-        // Mensaje de prueba
-        #[ink(message)]
-        pub fn reportar(&mut self) -> u128 {
-            self.marketplace.get_proximo_id_orden()
-        }
+        
     }
 }

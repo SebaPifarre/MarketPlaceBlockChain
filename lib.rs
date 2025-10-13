@@ -1,5 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
+pub use self::usuarios_sistema::{
+    Sistema,
+    SistemaRef
+};
+
 #[ink::contract]
 mod usuarios_sistema {
     use ink::prelude::{string::String};
@@ -1049,6 +1054,7 @@ mod usuarios_sistema {
             }
             mis_ordenes
         }
+
     }
 
     impl Usuario {
