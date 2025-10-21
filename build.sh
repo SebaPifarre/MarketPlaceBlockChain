@@ -19,6 +19,11 @@ if [ "$1" == "-h" ] || [ "$1" == "--help" ]; then
 elif [ -z "$1" ] || [ "$1" == "ambos" ]; then
     echo "No se recibió parámetro. Compilando ambos contratos..."
     compilar_contrato
+    status=$?
+    if [ $status -ne 0 ]; then
+        echo "Error: la compilación del marketplace falló (exit code $status). Abortando compilación de reportes."
+        exit $status
+    fi
     cd ReportesView && compilar_contrato
 elif [ "$1" == "marketplace" ]; then
     compilar_contrato

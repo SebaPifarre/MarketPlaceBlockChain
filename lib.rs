@@ -2,7 +2,9 @@
 
 pub use self::usuarios_sistema::{
     Sistema,
-    SistemaRef
+    SistemaRef,
+    Usuario,
+    ErrorSistema,
 };
 
 #[ink::contract]
@@ -46,6 +48,8 @@ mod usuarios_sistema {
         proximo_id_publicacion: u128,
         proximo_id_producto: u128,
         proximo_id_orden: u128,
+        owner: AccountId,
+        reportes_view: Option<AccountId>,
     }
 
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
@@ -84,6 +88,9 @@ mod usuarios_sistema {
         PuntuacionNoValida,
         OrdenYaPuntuada,
         NoPuedePuntuarOrdenSinRecibir,
+        // ReportesView
+        AccesoDenegado,
+        ReportesViewNoDefinido,
     }
 
     /// # Esta es la estructura de un usuario.
@@ -283,10 +290,38 @@ mod usuarios_sistema {
         /// ```
         #[ink(constructor)]
         pub fn new() -> Self {
-            Self {id_usuarios: Vec::<AccountId>::new(),  usuarios: Mapping::new(), publicaciones: Vec::<Publicacion>::new(), productos: Mapping::new(), ordenes:Vec::new(), proximo_id_publicacion: 0, proximo_id_producto: 0 , proximo_id_orden: 0}
+            Self {
+                id_usuarios: Vec::<AccountId>::new(),
+                usuarios: Mapping::new(),
+                publicaciones: Vec::<Publicacion>::new(),
+                productos: Mapping::new(),
+                ordenes:Vec::new(),
+                proximo_id_publicacion: 0,
+                proximo_id_producto: 0,
+                proximo_id_orden: 0,
+                reportes_view: None,
+                owner: Self::env().caller()
+            }
         }
 
+        /// Setea el usuario que podrá ver los reportes de compras en el sistema.
+        /// Sólo el propietario del sistema puede llamar a esta función.
+        /// No recibe parámetros.
+        /// Retorna `Ok(())` si el usuario se ha establecido correctamente, o un error si no existe.
+        /// # Ejemplo
+        /// 
+        #[ink(message)]
+        pub fn set_reportes_view(&mut self, reportes_view: AccountId) {
+            self._set_reportes_view(reportes_view);
+        }
 
+        fn _set_reportes_view(&mut self, reportes_view: AccountId) {
+            let caller = self.env().caller();
+
+            if caller == self.owner && self.reportes_view.is_none() {
+                self.reportes_view = Some(reportes_view);
+            }
+        }
 
         /// Verifica si el usuario que llama existe.
         /// Retorna `Ok(true)` si existe, o un error si no existe.
@@ -803,12 +838,12 @@ mod usuarios_sistema {
         fn _marcar_orden_como_enviada(&mut self, id_actual:u128, caller:AccountId)->Result<(), ErrorSistema>{
 
 
-            if let Some(orden_acutal) = self.ordenes.get_mut(id_actual as usize){
-                if orden_acutal.id_vendedor != caller {
+            if let Some(orden_actual) = self.ordenes.get_mut(id_actual as usize){
+                if orden_actual.id_vendedor != caller {
                     return Err(ErrorSistema::OperacionNoValida)
                 } 
-                match &orden_acutal.estado {
-                    EstadoOrdenCompra::Pendiente => Ok(orden_acutal.estado = EstadoOrdenCompra::Enviado),
+                match &orden_actual.estado {
+                    EstadoOrdenCompra::Pendiente => Ok(orden_actual.estado = EstadoOrdenCompra::Enviado),
                     _ => return Err(ErrorSistema::OperacionNoValida),
                 }
                  
@@ -837,18 +872,19 @@ mod usuarios_sistema {
         fn _marcar_orden_como_recibida(&mut self, id_actual:u128, caller:AccountId)->Result<(), ErrorSistema>{
             
 
-            if let Some(orden_acutal) = self.ordenes.get_mut(id_actual as usize){
-                if orden_acutal.id_comprador != caller {
+            if let Some(orden_actual) = self.ordenes.get_mut(id_actual as usize){
+                if orden_actual.id_comprador != caller {
                     return Err(ErrorSistema::OperacionNoValida)
                 } 
-                match &orden_acutal.estado {
+                match &orden_actual.estado {
                     EstadoOrdenCompra::Enviado => {
-                        for (id_producto, cantidad) in &orden_acutal.lista_productos{
+                        for (id_producto, cantidad) in &orden_actual.lista_productos{
                             let mut produc = self.productos.get(id_producto).unwrap();
-                            produc.total_ventas += cantidad;
+                            produc.total_ventas = produc.total_ventas.checked_add(*cantidad)
+                                .ok_or(ErrorSistema::FueraDeRango)?;
                             self.productos.insert(id_producto, &produc);
                         }
-                        return Ok(orden_acutal.estado = EstadoOrdenCompra::Recibido);
+                        return Ok(orden_actual.estado = EstadoOrdenCompra::Recibido);
                     },
                     _ => return Err(ErrorSistema::OperacionNoValida),
                 }
@@ -1185,47 +1221,70 @@ mod usuarios_sistema {
         }
 
         #[ink(message)]
-        pub fn estadisticas_por_categoria(&self) -> Vec<(Categoria, u32, u8)> { 
+        pub fn estadisticas_por_categoria(&self) -> Result<Vec<(Categoria, u32, u8)>, ErrorSistema> { 
             self._estadisticas_por_categoria()
         }
 
-        fn _estadisticas_por_categoria(&self) -> Vec<(Categoria, u32, u8)>{
-
+        fn _estadisticas_por_categoria(&self) -> Result<Vec<(Categoria, u32, u8)>, ErrorSistema>{
             let mut ventas_por_categoria: BTreeMap<Categoria, u32> = BTreeMap::new();
             let mut suma_puntajes: BTreeMap<Categoria, u8> = BTreeMap::new();
             let mut cantidad_puntajes: BTreeMap<Categoria, u8> = BTreeMap::new();
 
-            // Recorremos todos los productos
-            let mut id:u128 = 0;
+            let mut id: u128 = 0;
             while id < self.proximo_id_producto {
                 if let Some(producto) = self.productos.get(&id) {
-                    // Acumular ventas
-                    *ventas_por_categoria.entry(producto.categoria.clone()).or_insert(0) += producto.total_ventas;
+                    let key = producto.categoria.clone();
+                    let entry = ventas_por_categoria.entry(key.clone()).or_insert(0u32);
+                    let nueva_ventas = entry
+                        .checked_add(producto.total_ventas)
+                        .ok_or(ErrorSistema::FueraDeRango)?;
+                    *entry = nueva_ventas;
 
-                    // Acumular puntuaciones
                     let suma: u8 = producto.puntuaciones.iter().map(|&x| x as u8).sum();
                     let cantidad = producto.puntuaciones.len() as u8;
-                    *suma_puntajes.entry(producto.categoria.clone()).or_insert(0) += suma;
-                    *cantidad_puntajes.entry(producto.categoria.clone()).or_insert(0) += cantidad;
+
+                    let s_entry = suma_puntajes.entry(key.clone()).or_insert(0u8);
+                    let nueva_suma = s_entry
+                        .checked_add(suma)
+                        .ok_or(ErrorSistema::FueraDeRango)?;
+                    *s_entry = nueva_suma;
+
+                    let c_entry = cantidad_puntajes.entry(key.clone()).or_insert(0u8);
+                    let nueva_cant = c_entry
+                        .checked_add(cantidad)
+                        .ok_or(ErrorSistema::FueraDeRango)?;
+                    *c_entry = nueva_cant;
                 }
-                id += 1;
+                id = id.checked_add(1).ok_or(ErrorSistema::FueraDeRango)?;
             }
 
-            // Construir el resultado
             let mut resultado = Vec::new();
             for categoria in ventas_por_categoria.keys() {
                 let ventas = *ventas_por_categoria.get(categoria).unwrap_or(&0);
                 let suma = *suma_puntajes.get(categoria).unwrap_or(&0);
                 let cantidad = *cantidad_puntajes.get(categoria).unwrap_or(&0);
-                let promedio = if cantidad > 0 {
-                    suma  / cantidad 
-                } else {
-                    0
+                let promedio = match suma.checked_div(cantidad) {
+                    Some(promedio) => promedio,
+                    None => 0,
                 };
                 resultado.push((categoria.clone(), ventas, promedio));
             }
-            resultado
+            Ok(resultado)
         }
+
+        // ReportesView
+        fn verificar_reportes_view(&self) -> Result<(), ErrorSistema> {
+            if let Some(addr) = self.reportes_view {
+                if addr != self.env().caller() {
+                    return Err(ErrorSistema::AccesoDenegado);
+                }
+                Ok(())
+            } else {
+                Err(ErrorSistema::ReportesViewNoDefinido)
+            }
+        }
+
+
     }
 
 

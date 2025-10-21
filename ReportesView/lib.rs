@@ -3,7 +3,13 @@
 #[ink::contract]
 mod ReportesView {
     use ink::codegen::TraitCallBuilder;
-    use MarketPlace::SistemaRef;
+    use ink::prelude::vec::Vec;
+    
+    use MarketPlace::{
+        SistemaRef,
+        Usuario,
+        ErrorSistema,
+    };
 
     #[ink(storage)]
     pub struct ReportesView {
@@ -25,6 +31,9 @@ mod ReportesView {
             Self { marketplace }
         }
 
-        
+        #[ink(message)]
+        pub fn obtener_top_compradores(&self) -> Vec<Usuario> {
+            self.marketplace.consultar_top_5_compradores()
+        }
     }
 }
