@@ -115,7 +115,7 @@ Un `enum` que describe el ciclo de vida de una orden de compra:
 
 ## Funciones principales
 
-El contrato `Sistema` ofrece las siguientes funcionalidades (mensajes de contrato):
+### Marketplace
 
 -   **`new()`**: Constructor del contrato.
 -   **`es_vendedor()`**: Verifica si el `caller` tiene el rol de `Vendedor` o `Ambos`.
@@ -130,6 +130,13 @@ El contrato `Sistema` ofrece las siguientes funcionalidades (mensajes de contrat
 -   **`cancelar_orden(id_actual)`**: Permite a un comprador o vendedor solicitar la cancelación de una orden. La orden se cancela si y solo si ambos la solicitan.
 -   **`get_publicaciones()`**: Devuelve una lista de todas las publicaciones activas en el sistema.
 -   **`ver_mis_ordenes()`**: Devuelve una lista de las órdenes de compra asociadas al `caller`.
+
+### ReportesView
+
+- **`consultar_top_5_vendedores()`**: Devuelve hasta 5 usuarios (Vendedor/Ambos) ordenados por puntaje como vendedor. (Result<Vec<Usuario>, ErrorSistema> si la verificación remota falla)
+- **`consultar_top_5_compradores()`**: Devuelve hasta 5 usuarios (Comprador/Ambos) ordenados por puntaje como comprador.
+- **`ver_productos_mas_vendidos(categoria)`**: Devuelve Vec<(id_producto, ventas)> ordenado descendente (top 10).
+- **`estadisticas_por_categoria()`**: Result<Vec<(Categoria, total_ventas: u32, promedio_puntuacion: u8)>, ErrorSistema> — ventas y promedio por categoría; puede devolver ErrorSistema en caso de overflow.
 
 ## Ejecución de tests
 Con el comando **`cargo test --lib`**.
