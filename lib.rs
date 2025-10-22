@@ -5,6 +5,7 @@ pub use self::usuarios_sistema::{
     SistemaRef,
     Usuario,
     ErrorSistema,
+    Categoria
 };
 
 #[ink::contract]
@@ -1179,8 +1180,9 @@ mod usuarios_sistema {
         }
 
         #[ink(message)]
-        pub fn ver_productos_mas_vendidos(&self, categoria: Categoria) -> Vec<(u128, u8)> {
-            self._ver_productos_mas_vendidos(categoria)
+        pub fn ver_productos_mas_vendidos(&self, categoria: Categoria) -> Result<Vec<(u128, u8)>, ErrorSistema>{
+            self.verificar_reportes_view()?;
+            Ok(self._ver_productos_mas_vendidos(categoria))
         }
 
         fn _ver_productos_mas_vendidos(&self, categoria: Categoria) -> Vec<(u128, u8)> {

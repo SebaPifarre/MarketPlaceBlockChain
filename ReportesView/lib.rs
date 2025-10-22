@@ -9,6 +9,7 @@ mod ReportesView {
         SistemaRef,
         Usuario,
         ErrorSistema,
+        Categoria
     };
 
     #[ink(storage)]
@@ -44,6 +45,11 @@ mod ReportesView {
         #[ink(message)]
         pub fn obtener_estadisticas_por_categoria(&self) -> Result<Vec<(Categoria, u32, u8)>, ErrorSistema> { 
             self.marketplace.estadisticas_por_categoria()
+        }
+
+        #[ink(message)]
+        pub fn ver_productos_mas_vendidos(&self, categoria: Categoria) -> Result<Vec<(u128, u8)>, ErrorSistema> {
+            self.marketplace.ver_productos_mas_vendidos(categoria)
         }
 
     }
