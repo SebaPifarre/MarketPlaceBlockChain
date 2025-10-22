@@ -91,7 +91,8 @@ mod usuarios_sistema {
         NoPuedePuntuarOrdenSinRecibir,
         // ReportesView
         AccesoDenegado,
-        ReportesViewNoDefinido,
+        ReportesViewNoEstablecido,
+        ReportesViewYaEstablecido,
     }
 
     /// # Esta es la estructura de un usuario.
@@ -312,16 +313,23 @@ mod usuarios_sistema {
         /// # Ejemplo
         /// 
         #[ink(message)]
-        pub fn set_reportes_view(&mut self, reportes_view: AccountId) {
-            self._set_reportes_view(reportes_view);
+        pub fn set_reportes_view(&mut self, reportes_view: AccountId) -> Result<(), ErrorSistema> {
+            self._set_reportes_view(reportes_view)
         }
 
-        fn _set_reportes_view(&mut self, reportes_view: AccountId) {
+        fn _set_reportes_view(&mut self, reportes_view: AccountId) -> Result<(), ErrorSistema> {
             let caller = self.env().caller();
 
-            if caller == self.owner && self.reportes_view.is_none() {
-                self.reportes_view = Some(reportes_view);
+            if caller != self.owner {
+                return Err(ErrorSistema::AccesoDenegado);
             }
+
+            if self.reportes_view.is_some() {
+                return Err(ErrorSistema::ReportesViewYaEstablecido);
+            }
+            
+            self.reportes_view = Some(reportes_view);
+            Ok(())
         }
 
         /// Verifica si el usuario que llama existe.
@@ -1304,7 +1312,7 @@ mod usuarios_sistema {
                 }
                 Ok(())
             } else {
-                Err(ErrorSistema::ReportesViewNoDefinido)
+                Err(ErrorSistema::ReportesViewNoEstablecido)
             }
         }
 
