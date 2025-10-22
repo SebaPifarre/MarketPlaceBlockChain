@@ -11,7 +11,6 @@ pub use self::usuarios_sistema::{
 #[ink::contract]
 mod usuarios_sistema {
 
-
     use ink::prelude::{string::String};
     use ink::storage::Mapping;   
     use ink::prelude::vec::Vec;
@@ -146,7 +145,6 @@ mod usuarios_sistema {
         derive(ink::storage::traits::StorageLayout)
     )]
     #[derive(Clone, PartialEq, Eq, Debug)]
-
     pub enum Rol {
         Comprador,
         Vendedor,
@@ -163,19 +161,12 @@ mod usuarios_sistema {
         derive(ink::storage::traits::StorageLayout)
     )]
     pub struct Producto{
-
         nombre: String,
-        
         descripcion: String,
-
         categoria: Categoria,
-
         puntuaciones: Vec<u8>,
-
         total_ventas: u32,
     }
-
-
 
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
@@ -306,24 +297,34 @@ mod usuarios_sistema {
             }
         }
 
-        /// Setea el usuario que podrá ver los reportes de compras en el sistema.
-        /// Sólo el propietario del sistema puede llamar a esta función.
-        /// No recibe parámetros.
-        /// Retorna `Ok(())` si el usuario se ha establecido correctamente, o un error si no existe.
-        /// # Ejemplo
-        /// 
-        #[ink(message)]
-        pub fn set_reportes_view(&mut self, reportes_view: AccountId) -> Result<(), ErrorSistema> {
-            self._set_reportes_view(reportes_view)
-        }
-
-        fn _set_reportes_view(&mut self, reportes_view: AccountId) -> Result<(), ErrorSistema> {
+        fn verificar_owner(&self) -> Result<(), ErrorSistema> {
             let caller = self.env().caller();
 
             if caller != self.owner {
                 return Err(ErrorSistema::AccesoDenegado);
             }
 
+            Ok(())
+        }
+        
+        /// (A fines de debug solamente) Retorna el AccountId establecido para ReportesView.
+        #[ink(message)]
+        pub fn get_reportes_view(&self) -> Result<Option<AccountId>, ErrorSistema> {
+            self.verificar_owner()?;
+            Ok(self.reportes_view)
+        }
+
+        /// Setea el AccountId de ReportesView.
+        /// Sólo el propietario del sistema puede llamar a esta función.
+        /// Retorna `Ok(())` si se estableció correctamente, o un error si no existe.
+        #[ink(message)]
+        pub fn set_reportes_view(&mut self, reportes_view: AccountId) -> Result<(), ErrorSistema> {
+            self.verificar_owner()?;
+            self._set_reportes_view(reportes_view)?;
+            Ok(())
+        }
+
+        fn _set_reportes_view(&mut self, reportes_view: AccountId) -> Result<(), ErrorSistema> {
             if self.reportes_view.is_some() {
                 return Err(ErrorSistema::ReportesViewYaEstablecido);
             }
@@ -1306,8 +1307,10 @@ mod usuarios_sistema {
 
         // ReportesView
         fn verificar_reportes_view(&self) -> Result<(), ErrorSistema> {
-            if let Some(addr) = self.reportes_view {
-                if addr != self.env().caller() {
+            let caller = self.env().caller();
+
+            if let Some(reportes_view) = self.reportes_view {
+                if  caller != reportes_view {
                     return Err(ErrorSistema::AccesoDenegado);
                 }
                 Ok(())
@@ -1318,7 +1321,6 @@ mod usuarios_sistema {
 
 
     }
-
 
     impl Usuario {
         pub fn agregar_rol(&mut self, rol: Rol) -> Result<(), ErrorSistema> { 
@@ -1363,22 +1365,20 @@ mod usuarios_sistema {
     }
 
     impl Publicacion {
-            fn actualizar_stock(&mut self, cant:u32)->Result<(),ErrorSistema>{
-                match self.stock.checked_sub(cant){
-                    Some(val) => {
-                        self.stock = val;
-                        Ok(())
-                    }
-                    None => Err(ErrorSistema::PublicacionesLleno)
+        fn actualizar_stock(&mut self, cant:u32)->Result<(),ErrorSistema>{
+            match self.stock.checked_sub(cant){
+                Some(val) => {
+                    self.stock = val;
+                    Ok(())
                 }
-            }
-
-            fn tiene_stock_suficiente(&self, cant:u32)->bool{
-                self.stock >= cant
+                None => Err(ErrorSistema::PublicacionesLleno)
             }
         }
 
-        
+        fn tiene_stock_suficiente(&self, cant:u32)->bool{
+            self.stock >= cant
+        }
+    } 
 
     /// Unit tests in Rust are normally defined within such a `#[cfg(test)]`
     /// module and test functions are marked with a `#[test]` attribute.
@@ -3224,7 +3224,6 @@ mod usuarios_sistema {
         }
 
     }
-}
 
 
     /// This is how you'd write end-to-end (E2E) or integration tests for ink! contracts.
@@ -3298,4 +3297,4 @@ mod usuarios_sistema {
         }
     }
 
-
+}
