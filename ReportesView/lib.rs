@@ -36,5 +36,15 @@ mod ReportesView {
             self.marketplace.consultar_top_5_compradores()
         }
 
+        #[ink(message)]
+        pub fn obtener_top_vendedores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
+            self.marketplace.consultar_top_5_vendedores()
+        }
+
+        #[ink(message)]
+        pub fn obtener_estadisticas_por_categoria(&self) -> Result<Vec<(Categoria, u32, u8)>, ErrorSistema> { 
+            self.marketplace.estadisticas_por_categoria()
+        }
+
     }
 }

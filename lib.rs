@@ -1126,11 +1126,12 @@ mod usuarios_sistema {
         //LAS SIGUIENTES FUNCIONES SON PARTE DEL CONTRATO 2. CORRER EN EL FUTURO (ESPACIO TEMPORAL)
         //Consultar top 5 vendedores con mejor reputación
          #[ink(message)]
-        pub fn consultar_top_5_vendedores(&self) -> Vec<Usuario> {
+        pub fn consultar_top_5_vendedores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
+            self.verificar_reportes_view()?;
             self._consultar_top_5_vendedores()
         }
 
-        fn _consultar_top_5_vendedores(&self) -> Vec<Usuario> {
+        fn _consultar_top_5_vendedores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
             //Filtro los vendedores recorriendo el vector de id_usuarios y buscando en el mapping.
             let mut vendedores: Vec<Usuario> = Vec::new(); //Creo un vector con los vendedores.
             for id in &self.id_usuarios {
@@ -1147,18 +1148,17 @@ mod usuarios_sistema {
             //Recorto el tamaño del vector a 5.
             vendedores.truncate(5);
 
-            vendedores
+            Ok(vendedores)
         }
 
         //Consultar top 5 compradores con mejor reputación
          #[ink(message)]
         pub fn consultar_top_5_compradores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
+            self.verificar_reportes_view()?;
             self._consultar_top_5_compradores()
         }
 
         fn _consultar_top_5_compradores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
-            self.verificar_reportes_view()?;
-
             //Filtro los compradores recorriendo el vector de id_usuarios y buscando en el mapping.
             let mut compradores: Vec<Usuario> = Vec::new(); //Creo un vector con los compradores.
             for id in &self.id_usuarios {
@@ -1224,6 +1224,7 @@ mod usuarios_sistema {
 
         #[ink(message)]
         pub fn estadisticas_por_categoria(&self) -> Result<Vec<(Categoria, u32, u8)>, ErrorSistema> { 
+            self.verificar_reportes_view()?;
             self._estadisticas_por_categoria()
         }
 
