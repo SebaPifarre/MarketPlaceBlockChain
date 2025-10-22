@@ -33,6 +33,8 @@ mod usuarios_sistema {
     /// - `proximo_id_publicacion`: Contador para el próximo id único de publicación.
     /// - `proximo_id_producto`: Contador para el próximo id único de producto.
     /// - `proximo_id_orden`: Contador para el próximo id único de orden de compra.
+    /// - `owner`: La cuenta del propietario del contrato.
+    /// - `reportes_view`: La cuenta de ReportesView.
     ///
     /// # Ejemplo de uso
     /// ```
@@ -2923,11 +2925,18 @@ mod usuarios_sistema {
         #[ink::test]
         //Test que verifica que la funcionalidad top_5_vendedores funcione correctamente. (Caso en el que hay más de 5 vendedores).
         fn test_top_5_vendedores_okay() {
+            // Alice como owner de los contratos
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+
             let mut sistema = Sistema::new();
+
+            // Pongo a la misma Alice simulando ser ReportesView para que pueda
+            // enviar los mensajes relativos a este
+            sistema.set_reportes_view(alice);
 
             //Preparo a los vendedores.
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
-            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
             let django = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().django;
             let eve = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().eve;
@@ -2984,7 +2993,8 @@ mod usuarios_sistema {
             }
     
             //Pido el top 5 de vendedores.
-            let top_5 = sistema.consultar_top_5_vendedores();
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            let top_5 = sistema.consultar_top_5_vendedores().unwrap();
             assert_eq!(top_5.len(), 5); //Debe devolver 5 vendedores.
                 
 
@@ -2999,15 +3009,32 @@ mod usuarios_sistema {
         #[ink::test]
         //Este test chequea que la funcionalidad top_5_vendedores funcione correctamente (Caso en el que no hay vendedores).
         fn test_top_5_vendedores_nulo() {
-            let sistema = Sistema::new();
-            let top_5 = sistema.consultar_top_5_vendedores();
+            // Alice como owner de los contratos
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+
+            let mut sistema = Sistema::new();
+
+            // Pongo a la misma Alice simulando ser ReportesView para que pueda
+            // enviar los mensajes relativos a este
+            sistema.set_reportes_view(alice);
+            
+            let top_5 = sistema.consultar_top_5_vendedores().unwrap();
             assert!(top_5.is_empty()); //Debe devolver un vector vacío.
         }
 
         #[ink::test]
         //Este test chequea que la funcionalidad top_5_vendedores funcione correctamente (Caso en el que hay menos de 5 vendedores).
         fn test_top_5_vendedores_menor_a_5() {
+            // Alice como owner de los contratos
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+
             let mut sistema = Sistema::new();
+
+            // Pongo a la misma Alice simulando ser ReportesView para que pueda
+            // enviar los mensajes relativos a este
+            sistema.set_reportes_view(alice);
 
             //Preparo a los vendedores.
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
@@ -3041,7 +3068,8 @@ mod usuarios_sistema {
             }
     
             //Pido el top 5 de vendedores.
-            let top_5 = sistema.consultar_top_5_vendedores();
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            let top_5 = sistema.consultar_top_5_vendedores().unwrap();
             assert_eq!(top_5.len(), 3); //Debe devolver 3 vendedores (los únicos que hay).
                 
 
@@ -3054,7 +3082,15 @@ mod usuarios_sistema {
 
          #[ink::test]
         fn test_productos_mas_vendidos() {
+            // Alice como owner de los contratos
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+
             let mut sistema = Sistema::new();
+
+            // Pongo a la misma Alice simulando ser ReportesView para que pueda
+            // enviar los mensajes relativos a este
+            sistema.set_reportes_view(alice);
 
             //Preparo a los vendedores.
             let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
@@ -3081,8 +3117,9 @@ mod usuarios_sistema {
             sistema.generar_orden_compra(vec![(1, 3), (2, 1)], 10000); //Compra 2 Remera y 1 Pantalon 
             sistema.generar_orden_compra(vec![(3, 3), (0, 1), (2, 2)], 10000); //Compra 3 Arroz, 1 Cif y 2 Pantalon 
 
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice); // Alice es ReportesView
+            let productos_mas_vendidos = sistema.ver_productos_mas_vendidos(Categoria::Ropa).unwrap();
 
-            let productos_mas_vendidos = sistema.ver_productos_mas_vendidos(Categoria::Ropa);
             assert_eq!(productos_mas_vendidos.len(), 2); //Debe devolver 2 productos.
             assert_eq!(productos_mas_vendidos[0].0, 1); //El producto más vendido es la Remera (ID 1).
             assert_eq!(productos_mas_vendidos[0].1, 4); //Se vendieron 4 Remeras.
@@ -3094,8 +3131,15 @@ mod usuarios_sistema {
 
         #[ink::test]
         fn test_productos_mas_vendidos_vacio() {
+            // Alice como owner de los contratos
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
 
             let mut sistema = Sistema::new();
+
+            // Pongo a la misma Alice simulando ser ReportesView para que pueda
+            // enviar los mensajes relativos a este
+            sistema.set_reportes_view(alice);
 
             //Preparo a los vendedores.
             let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
@@ -3122,7 +3166,8 @@ mod usuarios_sistema {
             sistema.generar_orden_compra(vec![(1, 3), (2, 1)], 10000); //Compra 2 Remera y 1 Pantalon 
             sistema.generar_orden_compra(vec![(3, 3), (0, 1), (2, 2)], 10000); //Compra 3 Arroz, 1 Cif y 2 Pantalon 
 
-            let productos_mas_vendidos = sistema.ver_productos_mas_vendidos(Categoria::Musica);
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice); // Alice es ReportesView
+            let productos_mas_vendidos = sistema.ver_productos_mas_vendidos(Categoria::Musica).unwrap();
             assert_eq!(productos_mas_vendidos.len(), 0); //Debe devolver 2 productos.
         }
 
@@ -3131,7 +3176,16 @@ mod usuarios_sistema {
 
         #[ink::test]
         fn test_estadisticas_por_categorias() {
+            // Alice como owner de los contratos
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+
             let mut sistema = Sistema::new();
+
+            // Pongo a la misma Alice simulando ser ReportesView para que pueda
+            // enviar los mensajes relativos a este
+            sistema.set_reportes_view(alice);
+
             sistema.productos.insert(0, &Producto{
                 nombre:"remera".to_string(),
                 descripcion:"negra".to_string(),
@@ -3158,7 +3212,7 @@ mod usuarios_sistema {
 
             sistema.proximo_id_producto = 3;
 
-            assert_eq!(sistema.estadisticas_por_categoria(), vec![(Categoria::Tecnologia, 100, 2), (Categoria::Ropa, 35, 2)]);
+            assert_eq!(sistema.estadisticas_por_categoria().unwrap(), vec![(Categoria::Tecnologia, 100, 2), (Categoria::Ropa, 35, 2)]);
         }
 
         //-------------------------------------------------------------------------------------
@@ -3166,11 +3220,19 @@ mod usuarios_sistema {
 
         #[ink::test]
         fn test_top_5_compradores() {
-            let mut sistema = Sistema::new();
-
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
-            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;            
+
+            // Alice como owner de los contratos
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+
+            let mut sistema = Sistema::new();
+
+            // Pongo a la misma Alice simulando ser ReportesView para que pueda
+            // enviar los mensajes relativos a este
+            sistema.set_reportes_view(alice);
 
             sistema.usuarios.insert(charlie, &Usuario{
                 nombre:"charlie".to_string(),
@@ -3215,11 +3277,13 @@ mod usuarios_sistema {
             sistema.id_usuarios.push(alice);
             sistema.id_usuarios.push(bob);
 
-            assert_eq!(sistema.consultar_top_5_compradores()[0].id, bob);
+            let top_5 = sistema.consultar_top_5_compradores().unwrap();
 
-            assert_eq!(sistema.consultar_top_5_compradores()[1].id, alice);
+            assert_eq!(top_5[0].id, bob);
 
-            assert_eq!(sistema.consultar_top_5_compradores()[2].id, charlie);
+            assert_eq!(top_5[1].id, alice);
+
+            assert_eq!(top_5[2].id, charlie);
             
         }
 
