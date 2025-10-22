@@ -52,5 +52,10 @@ mod ReportesView {
             self.marketplace.ver_productos_mas_vendidos(categoria)
         }
 
+        #[ink(message)]
+        pub fn cantidad_ordenes_por_usuario(&self) -> Result<Vec<(AccountId, u128)>, ErrorSistema> {
+            self.marketplace.cantidad_ordenes_por_usuario()
+        }
+
     }
 }

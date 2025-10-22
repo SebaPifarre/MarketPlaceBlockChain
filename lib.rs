@@ -1277,6 +1277,25 @@ mod usuarios_sistema {
             Ok(resultado)
         }
 
+        #[ink(message)]
+        pub fn cantidad_ordenes_por_usuario(&self) -> Result<Vec<(AccountId, u128)>, ErrorSistema> {
+            self.verificar_reportes_view()?;
+            Ok(self._cantidad_ordenes_por_usuario())
+        }
+
+        fn _cantidad_ordenes_por_usuario(&self) -> Vec<(AccountId, u128)> {
+            let mut res: Vec<(AccountId, u128)> = Vec::new();
+            for id in &self.id_usuarios {
+                if let Some(user) = self.usuarios.get(id) {
+                    res.push((id.clone(), user.ordenes.len() as u128));
+                } else {
+                    // Si por alguna razón el id no existe en el mapping, devolver 0.
+                    res.push((id.clone(), 0));
+                }
+            }
+            res
+        }
+
         // ReportesView
         fn verificar_reportes_view(&self) -> Result<(), ErrorSistema> {
             if let Some(addr) = self.reportes_view {
