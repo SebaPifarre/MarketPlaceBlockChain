@@ -1311,17 +1311,19 @@ mod usuarios_sistema {
         fn verificar_reportes_view(&self) -> Result<(), ErrorSistema> {
             let caller = self.env().caller();
 
-            if let Some(reportes_view) = self.reportes_view {
-                if  caller != reportes_view {
-                    return Err(ErrorSistema::AccesoDenegado);
+            match self.reportes_view {
+                Some(reportes_view) => {
+                    if caller != reportes_view {
+                        return Err(ErrorSistema::AccesoDenegado);
+                    }
                 }
-                Ok(())
-            } else {
-                Err(ErrorSistema::ReportesViewNoEstablecido)
+                None => {
+                    return Err(ErrorSistema::ReportesViewNoEstablecido);
+                }
             }
+            Ok(())
         }
-
-
+        
     }
 
     impl Usuario {
@@ -3015,10 +3017,12 @@ mod usuarios_sistema {
 
             let mut sistema = Sistema::new();
 
-            // Pongo a la misma Alice simulando ser ReportesView para que pueda
-            // enviar los mensajes relativos a este
-            sistema.set_reportes_view(alice);
+            // Acá voy a usar a Bob como ReportesVew para comprobar que no hace
+            // falta que sea el owner del MarketPlace
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+            sistema.set_reportes_view(bob);
             
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
             let top_5 = sistema.consultar_top_5_vendedores().unwrap();
             assert!(top_5.is_empty()); //Debe devolver un vector vacío.
         }

@@ -33,27 +33,27 @@ mod ReportesView {
         }
 
         #[ink(message)]
-        pub fn obtener_top_compradores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
+        pub fn get_top_compradores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
             self.marketplace.consultar_top_5_compradores()
         }
 
         #[ink(message)]
-        pub fn obtener_top_vendedores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
+        pub fn get_top_vendedores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
             self.marketplace.consultar_top_5_vendedores()
         }
 
         #[ink(message)]
-        pub fn obtener_estadisticas_por_categoria(&self) -> Result<Vec<(Categoria, u32, u8)>, ErrorSistema> { 
+        pub fn get_estadisticas_por_categoria(&self) -> Result<Vec<(Categoria, u32, u8)>, ErrorSistema> { 
             self.marketplace.estadisticas_por_categoria()
         }
 
         #[ink(message)]
-        pub fn ver_productos_mas_vendidos(&self, categoria: Categoria) -> Result<Vec<(u128, u8)>, ErrorSistema> {
+        pub fn get_productos_mas_vendidos(&self, categoria: Categoria) -> Result<Vec<(u128, u8)>, ErrorSistema> {
             self.marketplace.ver_productos_mas_vendidos(categoria)
         }
 
         #[ink(message)]
-        pub fn cantidad_ordenes_por_usuario(&self) -> Result<Vec<(AccountId, u128)>, ErrorSistema> {
+        pub fn get_ordenes_por_usuario(&self) -> Result<Vec<(AccountId, u128)>, ErrorSistema> {
             self.marketplace.cantidad_ordenes_por_usuario()
         }
 
