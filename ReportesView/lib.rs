@@ -33,12 +33,12 @@ mod ReportesView {
         }
 
         #[ink(message)]
-        pub fn get_top_compradores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
+        pub fn get_top5_compradores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
             self.marketplace.consultar_top_5_compradores()
         }
 
         #[ink(message)]
-        pub fn get_top_vendedores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
+        pub fn get_top5_vendedores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
             self.marketplace.consultar_top_5_vendedores()
         }
 
