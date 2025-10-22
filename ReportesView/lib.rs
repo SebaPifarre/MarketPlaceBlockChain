@@ -32,8 +32,9 @@ mod ReportesView {
         }
 
         #[ink(message)]
-        pub fn obtener_top_compradores(&self) -> Vec<Usuario> {
+        pub fn obtener_top_compradores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
             self.marketplace.consultar_top_5_compradores()
         }
+
     }
 }
