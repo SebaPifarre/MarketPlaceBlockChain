@@ -19,7 +19,8 @@ mod usuarios_sistema {
 
     #[ink(storage)]
 
-    /// # Estructura principal de almacenamiento del contrato marketplace.
+    /// # Esta es la estructura del sistema del MarketPlace.
+    /// Estructura principal de almacenamiento del contrato marketplace.
     ///
     /// `Sistema` contiene toda la información persistente del contrato, incluyendo usuarios, productos,
     /// publicaciones, órdenes y los contadores para generar nuevos IDs únicos.
@@ -35,6 +36,11 @@ mod usuarios_sistema {
     /// - `owner`: La cuenta del propietario del contrato.
     /// - `reportes_view`: La cuenta de ReportesView.
     ///
+    /// # Ejemplo de uso
+    /// ```
+    ///      let sistema = Sistema::new();
+    ///      sistema.registrar_usuario("Juan".to_string(), "Perez".to_string(), "juan@email.com".to_string(), Rol::Comprador);
+    /// ```
     pub struct Sistema {
         usuarios: ink::storage::Mapping<AccountId, Usuario>,
         id_usuarios: Vec<AccountId>,
@@ -48,7 +54,6 @@ mod usuarios_sistema {
         reportes_view: Option<AccountId>,
     }
 
-    /// # Enumeración de los posibles errores que pueden ocurrir en ambos contratos.
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
         feature = "std",
@@ -91,7 +96,9 @@ mod usuarios_sistema {
         ReportesViewYaEstablecido,
     }
 
-    /// # Estructura de un usuario.
+    /// # Esta es la estructura de un usuario.
+    /// Representa un usuario del sistema de marketplace.
+    /// Contiene información personal, rol, publicaciones y órdenes asociadas.
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
         feature = "std",
@@ -100,49 +107,56 @@ mod usuarios_sistema {
     #[derive(Clone, PartialEq, Eq, Debug)]
 
     pub struct Usuario{
+        /// Nombre del Usuario
         nombre:String,
+
+        /// Apellido del Usuario
         apellido:String,
+
+        /// Correo electrónico del Usuario
         email:String,
+
+        /// Código identificador (AccountID) del usuario
         id:AccountId,
+
+        /// Ocupación que tiene el Usuario en la página
         rol: Rol,
-        publicaciones: Vec<u128>, // publicaciones como vendedor
-        ordenes: Vec<u128>, // ordenes como comprador
-        productos: Vec<u128>, // productos como vendedor
-        // reseñas que hicieron del usuario como comprador y como vendedor
+
+        //productos: Option<Producto>, //Si es vendedor tiene que tener una lista de sus productos.
+        //orden_compra: Option<OrdenDeCompra>, //Si es comprador tiene que tener una orden de compra.
+
+        /// Lista de Publicaciones (Id de publicaciones) que tiene un Usuario ´Vendedor´
+        publicaciones: Vec<u128>,
+
+        /// Lista de ´Ordenes de Compra´ (Id de Ordenes de compra) que tiene un Usuario ´Comprador´
+        ordenes: Vec<u128>,
+
+        /// Hashmap de productos del vendedor
+        productos: Vec<u128>,
+
+        /// Vector de calificaciones del usuario como comprador y como vendedor
         calificaciones_comprador: Vec<u8>,
+
         calificaciones_vendedor: Vec<u8>,
     }
     
-    /// # Estructura de un rol.
-    /// Representa los roles que un usuario puede tener en el sistema de marketplace.
-    /// Contiene los roles disponibles en el sistema.
-    ///
-    /// # Roles disponibles
-    /// - `Comprador`
-    /// - `Vendedor`
-    /// - `Ambos`: Conseguido este rol, no se podrá tomar ninguno de los otros dos valores.
-    ///
-    /// # Ejemplo de uso
-    /// ```
-    /// let marketplace = Sistema::new();
-    ///
-    /// marketplace.registrar_usuario(nombre, apellido, email, Rol::Comprador);
-    /// ``
+    
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
         feature = "std",
         derive(ink::storage::traits::StorageLayout)
     )]
     #[derive(Clone, PartialEq, Eq, Debug)]
-
     pub enum Rol {
         Comprador,
         Vendedor,
         Ambos,
     }
 
-    /// # Estructura de un Producto.
-    /// Es instanciada por la funcion `nuevo_producto` de Sistema.
+    /// # Esta es la estructura de un Producto.
+    /// Representa un producto en una publicación de marketplace.
+    /// 
+    /// Contiene el nombre, descripción y la categoría de éste.
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
         feature = "std",
@@ -156,7 +170,6 @@ mod usuarios_sistema {
         total_ventas: u32,
     }
 
-    /// Categorías en las que puede entrar un producto.
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
         feature = "std",
@@ -172,10 +185,13 @@ mod usuarios_sistema {
         Otros,
     }
 
-    /// # Estructura de una publicación.
+    // Publicación
+
+
+    /// Representa una publicación en el marketplace.
+    /// 
     /// Cada publicación está asociada a un producto específico y a un usuario vendedor.
     /// Contiene información relevante para la venta, como el precio, el stock disponible y el estado de la publicación.
-    /// Es instanciada por la funcion `crear_publicacion` de Sistema.
     ///
     /// # Campos
     /// - `id_publicacion`: Identificador único de la publicación.
@@ -185,13 +201,23 @@ mod usuarios_sistema {
     /// - `stock`: Cantidad disponible para la venta.
     /// - `activa`: Indica si la publicación está activa o no.
     ///
+    /// # Ejemplo de uso
+    /// ```
+    ///      let publicacion = Publicacion {
+    ///        id_publicacion: 1,
+    ///        id_producto: 10,
+    ///        id_publicador: AccountId::from([0x1; 32]),
+    ///        precio: 1000,
+    ///        stock: 5,
+    ///        activa: true,
+    ///      };
+    /// ```
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
         feature = "std",
         derive(ink::storage::traits::StorageLayout)
     )]
     #[derive(Debug, Copy, Clone)]
-
     pub struct Publicacion {
         id_publicacion: u128,
         id_producto: u128,
@@ -201,17 +227,6 @@ mod usuarios_sistema {
         activa: bool,
     }
 
-    /// # Estructura de una orden de compra.
-    ///
-    /// # Campos
-    /// - `lista_productos`: Vector de tuplas [(id_producto, cantidad)] que componen la orden.
-    /// - `id_orden_compra`: Identificador único de la orden.
-    /// - `estado`: Estado actual de la orden (Pendiente, Enviado, Recibido, Cancelado).
-    /// - `id_comprador`: `AccountId` del comprador.
-    /// - `id_vendedor`: `AccountId` del vendedor.
-    /// - `solicitud_cancelacion`: `Option<AccountId>` para registrar quién solicitó la cancelación.
-    /// - `monto`: Monto total de la orden.
-    ///
     #[derive(Debug, Clone)]
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
@@ -244,7 +259,6 @@ mod usuarios_sistema {
 
     }
 
-    /// # Estados de una orden de compra.
     #[derive(Debug, Clone, PartialEq)]
     #[ink::scale_derive(Encode, Decode, TypeInfo)]
     #[cfg_attr(
@@ -263,7 +277,8 @@ mod usuarios_sistema {
         // # Sistema::new()
         /// Crea una nueva instancia del sistema, inicializando los campos de almacenamiento.
         /// No recibe parámetros.
-        ///
+        /// Retorna una instancia de Sistema.
+        /// El new, inicializa todos los campos del sistema en un estado Default.
         /// # Ejemplo
         /// ```
         ///      let sistema = Sistema::new();
@@ -330,6 +345,8 @@ mod usuarios_sistema {
             }
         }
 
+
+        /// !Es_Vendedor()
         /// Verifica si el usuario que llama es vendedor o tiene ambos roles.
         /// Retorna `Ok(true)` si es vendedor o ambos, `Ok(false)` si no lo es, o un error si no existe.
         ///
@@ -361,6 +378,8 @@ mod usuarios_sistema {
             }
         }
 
+
+        /// !Es_Comprador()
         /// Verifica si el usuario que llama es comprador o tiene ambos roles.
         /// Retorna `Ok(true)` si es comprador o ambos, `Ok(false)` si no lo es, o un error si no existe.
         ///
@@ -394,6 +413,7 @@ mod usuarios_sistema {
 
         //Funciones asociadas a usuarios.
 
+        /// !Registrar_Usuario() 
         /// Registra un nuevo usuario en el sistema con los datos proporcionados.
         /// El usuario queda asociado al AccountId del caller.
         /// Retorna `Ok(())` si el registro fue exitoso, o un error si ya existe.
@@ -425,6 +445,7 @@ mod usuarios_sistema {
 
             Ok(())
         }
+
 
 
         /// Agrega un rol adicional al usuario que llama.
@@ -478,6 +499,7 @@ mod usuarios_sistema {
         }
 
 
+        /// #nuevo_producto()
         /// Crea un nuevo producto asociado al usuario que llama (debe ser vendedor).
         /// Retorna el id del producto creado o un error si no es vendedor.
         ///
@@ -545,6 +567,7 @@ mod usuarios_sistema {
 
 
 
+        /// #crear_Publicacion()
         /// Crea una nueva publicación para un producto existente.
         /// El usuario debe ser vendedor y el producto debe existir.
         /// Retorna `Ok(())` si la publicación fue creada, o un error en caso contrario.
@@ -1083,6 +1106,10 @@ mod usuarios_sistema {
             Ok(publicaciones_propias)
         }
 
+
+
+
+
         /// Devuelve la lista de órdenes asociadas al usuario que llama.
         ///
         /// # Ejemplo
@@ -1108,9 +1135,8 @@ mod usuarios_sistema {
             mis_ordenes
         }
 
-        
-        /// Devuelve hasta 5 usuarios (Vendedor/Ambos) ordenados por puntaje como vendedor.
-        /// Solo accesible si se ha establecido ReportesView.
+        //LAS SIGUIENTES FUNCIONES SON PARTE DEL CONTRATO 2. CORRER EN EL FUTURO (ESPACIO TEMPORAL)
+        //Consultar top 5 vendedores con mejor reputación
          #[ink(message)]
         pub fn consultar_top_5_vendedores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
             self.verificar_reportes_view()?;
@@ -1137,8 +1163,7 @@ mod usuarios_sistema {
             Ok(vendedores)
         }
 
-        /// Devuelve hasta 5 usuarios (Vendedor/Ambos) ordenados por puntaje como vendedor.
-        /// Solo accesible si se ha establecido ReportesView.
+        //Consultar top 5 compradores con mejor reputación
          #[ink(message)]
         pub fn consultar_top_5_compradores(&self) -> Result<Vec<Usuario>,ErrorSistema> {
             self.verificar_reportes_view()?;
@@ -1165,12 +1190,6 @@ mod usuarios_sistema {
             Ok(compradores)
         }
 
-        /// Devuelve una lista de hasta 10 productos de una categoría específica ordenados por ventas en forma descendente.
-        /// Solo accesible si se ha establecido ReportesView.
-        ///
-        /// # Parámetros
-        /// - `categoria`: Categoría de los productos a buscar.
-        ///
         #[ink(message)]
         pub fn ver_productos_mas_vendidos(&self, categoria: Categoria) -> Result<Vec<(u128, u8)>, ErrorSistema>{
             self.verificar_reportes_view()?;
@@ -1216,7 +1235,6 @@ mod usuarios_sistema {
             productos
         }
 
-        /// Devuelve un vector con las estadisticas por categoría, con la cantidad total de ventas y la suma de puntuaciones.
         #[ink(message)]
         pub fn estadisticas_por_categoria(&self) -> Result<Vec<(Categoria, u32, u8)>, ErrorSistema> { 
             self.verificar_reportes_view()?;
@@ -1270,7 +1288,6 @@ mod usuarios_sistema {
             Ok(resultado)
         }
 
-        /// Devuelve un vector con la cantidad de órdenes de todos los usuarios registrados.
         #[ink(message)]
         pub fn cantidad_ordenes_por_usuario(&self) -> Result<Vec<(AccountId, u128)>, ErrorSistema> {
             self.verificar_reportes_view()?;
@@ -1291,11 +1308,6 @@ mod usuarios_sistema {
         }
 
         // ReportesView
-
-        
-        /// Verifica que el usuario que llama es el mismo que se estableció como ReportesView.
-        /// Si no es el caso, devuelve ErrorSistema::AccesoDenegado.
-        /// Si ReportesView no ha sido establecido devuelve ErrorSistema::ReportesViewNoEstablecido.
         fn verificar_reportes_view(&self) -> Result<(), ErrorSistema> {
             let caller = self.env().caller();
 
@@ -1372,11 +1384,21 @@ mod usuarios_sistema {
         }
     } 
 
+    /// Unit tests in Rust are normally defined within such a `#[cfg(test)]`
+    /// module and test functions are marked with a `#[test]` attribute.
+    /// The below code is technically just normal Rust code.
     #[cfg(test)]
     mod tests {
 
+        /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
 
+
+        /// We test that we can register a user.
+        /// In this test the user is added successfully.
+        
+        
+        //---------------------------------------------------------------------------------
         //TESTS REGISTRAR USUARIO:
         #[ink::test]
         fn registrar_usuario_comprador_okay() {
@@ -1420,7 +1442,7 @@ mod usuarios_sistema {
             assert!(usuario.is_some());
         }
 
-         /// No se puede registrar un usuario que ya está registrado
+         /// We test that we cannot register a user that already exists.
          #[ink::test]
          fn registrar_usuario_not_okay() {
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
