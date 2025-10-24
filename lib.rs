@@ -219,29 +219,15 @@ mod usuarios_sistema {
         derive(ink::storage::traits::StorageLayout)
     )]
     pub struct OrdenCompra {
-        
-
-        lista_productos: Vec<(u128, u32)>,
-        // El vec lo pense con un vec de tuplas, con el id del producto y la cantidad comprada.
-
-        // Se me ocurre que dentro del usuario podemos tener un vec de órdenes de compra
-        // y para acceder a una en especifica que se use el id de orden
+        lista_productos: Vec<(u128, u32)>, // id del producto y la cantidad comprada.
         id_orden_compra: u128,
-
         estado: EstadoOrdenCompra,
-
         id_comprador: AccountId,
-
         id_vendedor: AccountId,
-
         solicitud_cancelacion: Option<AccountId>,
-
         monto:u32,
-
         puntuado_por_comprador: bool,
-
         puntuado_por_vendedor: bool,
-
     }
 
     /// # Estados de una orden de compra.
@@ -451,7 +437,7 @@ mod usuarios_sistema {
         /// ```
         #[ink(message)]
         pub fn nuevo_producto(&mut self, nombre: String, descripcion: String, categoria: Categoria) -> Result<u128, ErrorSistema> {
-            //El usuario que genera el producto debe existir en el sistema, y ser vendedor.
+            // El usuario que genera el producto debe existir en el sistema, y ser vendedor.
             let usuario_id = self.env().caller(); 
             if let Err(e) = self._existe_usuario(usuario_id) {
                 return Err(e);
@@ -599,17 +585,15 @@ mod usuarios_sistema {
         fn _generar_orden_compra(&mut self, lista_publicaciones_con_cantidades:Vec<(u128, u32)> , dinero_disponible:u32, caller:AccountId) -> Result<OrdenCompra, ErrorSistema>{
             // Chequeo si el usuario que está tratando de realizar la compra tiene el rol debido.
             
-            //Si no existe el usuario se propaga el error:
+            // Si no existe el usuario se propaga el error:
             self.es_comprador()?;
-            // // Verifico que el usuario sea comprador.
+            // Verifico que el usuario sea comprador.
             // Si no es comprador, retorno un error.
             if let comprador = self.es_comprador()? {
                 if !comprador {
                     return Err(ErrorSistema::UsuarioNoEsComprador);
                 }
             }
-
-
 
             // Verifico que por lo menos exista una compra.
             if lista_publicaciones_con_cantidades.is_empty() {
@@ -625,7 +609,7 @@ mod usuarios_sistema {
                 return Err(ErrorSistema::PublicacionNoValida)
             }
 
-            //Si el usuario que creó la publicación trata de realizar una compra hay error.
+            // Si el usuario que creó la publicación trata de realizar una compra hay error.
 
             if vendedor_actual == caller {
                 return Err(ErrorSistema::NoPuedeComprarPublicacionPropia);
@@ -1010,7 +994,7 @@ mod usuarios_sistema {
         ///
         /// # Ejemplo
         /// ```
-        ///      AGREGAR!!!! 
+        ///      let mis_publicaciones = sistema.get_publicaciones_propias();
         /// ```
         #[ink(message)]
         pub fn get_publicaciones_propias(&self)-> Result<Vec<Publicacion>, ErrorSistema>{
@@ -1379,7 +1363,7 @@ mod usuarios_sistema {
 
         //TESTS REGISTRAR USUARIO:
         #[ink::test]
-        fn registrar_usuario_comprador_okay() {
+        fn test_registrar_usuario_comprador_okay() {
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
 
@@ -1393,7 +1377,7 @@ mod usuarios_sistema {
         }
 
         #[ink::test]
-        fn registrar_usuario_vendedor_okay() {
+        fn test_registrar_usuario_vendedor_okay() {
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
 
@@ -1407,7 +1391,7 @@ mod usuarios_sistema {
         }
 
         #[ink::test]
-        fn registrar_usuario_ambos_okay() {
+        fn test_registrar_usuario_ambos_okay() {
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
 
@@ -1422,7 +1406,7 @@ mod usuarios_sistema {
 
          /// No se puede registrar un usuario que ya está registrado
          #[ink::test]
-         fn registrar_usuario_not_okay() {
+         fn test_registrar_usuario_not_okay() {
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
  
@@ -1439,7 +1423,7 @@ mod usuarios_sistema {
         //TESTS PRODUCTOS:
 
         #[ink::test]
-        fn nuevo_producto_usuario_inexistente() {
+        fn test_nuevo_producto_usuario_inexistente() {
             //Se testea que un usuario que no existe en la plataforma no pueda crear un producto.
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
@@ -1512,7 +1496,7 @@ mod usuarios_sistema {
 
         #[ink::test]
         // test para no permitir que un usuario cree una publicacion con un producto que no haya creado este
-        fn publicacion_con_usuario_sin_prodcuto_seleccionado(){
+        fn test_publicacion_con_usuario_sin_producto_seleccionado(){
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
@@ -1962,7 +1946,7 @@ mod usuarios_sistema {
   
         #[ink::test]
         //Este test es para ver si salta el error (operación no válida) al tratar de cancelar una orden ya recibida (ya que es algo que no se puede hacer).
-        fn cancelar_orden_ya_recibida() {
+        fn test_cancelar_orden_ya_recibida() {
             //Genero una orden de compra
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
@@ -2393,7 +2377,7 @@ mod usuarios_sistema {
 
         #[ink::test]
         // test que verifica que un usuario que no esta involucrado en una orden no pueda cancelarla
-        fn tercero_no_puede_cancelar_orden(){
+        fn test_tercero_no_puede_cancelar_orden(){
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
@@ -2734,7 +2718,7 @@ mod usuarios_sistema {
 
         #[ink::test]
         //Test que verifica que get publicaciones_propias funcione (con un caso en el que sí funciona).
-        fn get_publicaciones_propias_okay() {
+        fn test_get_publicaciones_propias_okay() {
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
@@ -2752,7 +2736,7 @@ mod usuarios_sistema {
 
         #[ink::test]
         //Test que verifica que get publicaciones_propias funcione (con un caso en el que el usuario es existe, es vendedor y no tiene publicaciones).
-        fn get_publicaciones_propias_vacio_okay() {
+        fn test_get_publicaciones_propias_vacio_okay() {
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
@@ -2768,7 +2752,7 @@ mod usuarios_sistema {
 
         #[ink::test]
         //Test que verifica que get publicaciones_propias 'no funcione' (con un caso en el que el usuario no existe en el sistema).
-        fn get_publicaciones_propias_usuario_no_existe() {
+        fn test_get_publicaciones_propias_usuario_no_existe() {
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
@@ -2780,7 +2764,7 @@ mod usuarios_sistema {
 
         #[ink::test]
         //Test que verifica que get publicaciones_propias 'no funcione' (con un caso en el que el usuario no es vendedor).
-        fn get_publicaciones_propias_usuario_no_vendedor() {
+        fn test_get_publicaciones_propias_usuario_no_vendedor() {
             let mut sistema = Sistema::new();
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
             ink::env::test::set_caller::<ink::env::DefaultEnvironment>(charlie);
@@ -2874,14 +2858,11 @@ mod usuarios_sistema {
         }
 
         //-------------------------------------------------------------------------------------
-        //COSAS DE MI PT DEL SEGUNDO CONTRATO
-
-        //-------------------------------------------------------------------------------------
         //TEST ID USUARIOS
 
         #[ink::test]
         //Test que verifica que los IDs de los usuarios se agregan correctamente al vector de IDs.
-        fn agregar_id_okay() {
+        fn test_agregar_id_okay() {
             let mut sistema = Sistema::new();
 
             let charlie = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().charlie;
@@ -2894,7 +2875,7 @@ mod usuarios_sistema {
 
         #[ink::test]
         //Test que verifica que el vector de ids de usuarios está vecío cuando no hay nada.
-        fn ids_vacio_okay() {
+        fn test_ids_vacio_okay() {
             let sistema = Sistema::new();
             assert!(sistema.id_usuarios.is_empty()); //El vector de IDs debe estar vacío.
         }
@@ -3267,6 +3248,68 @@ mod usuarios_sistema {
 
             assert_eq!(top_5[2].id, charlie);
             
+        }
+
+        //-------------------------------------------------------------------------------------
+        //TESTS PARA CANTIDAD DE ORDENES DE COMPRA
+
+        #[ink::test]
+        fn test_cantidad_ordenes_cero() {
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+
+            let mut sistema = Sistema::new();
+            sistema.set_reportes_view(alice);
+            
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
+
+            let cantidades_ordenes = sistema.cantidad_ordenes_por_usuario().unwrap();
+
+            let ordenes_alice = cantidades_ordenes.clone()
+            .into_iter()
+            .find(|(id, _)| *id == alice)
+            .map(|(_, ordenes)| ordenes)
+            .unwrap();
+
+            assert_eq!(cantidades_ordenes.len(), 1); // Hay solo un usuario registrado, habrá una única tupla en el vector
+            assert_eq!(ordenes_alice, 0); // Alice tiene 0 ordenes
+        }
+
+        #[ink::test]
+        fn test_cantidad_ordenes_una() {
+            let alice = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().alice;
+            let bob = ink::env::test::default_accounts::<ink::env::DefaultEnvironment>().bob;
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+
+            let mut sistema = Sistema::new();
+            sistema.set_reportes_view(alice);
+            
+            sistema.registrar_usuario(String::from("Alice"), String::from("Surname"), String::from("alice.email"), Rol::Ambos);
+            sistema.nuevo_producto("Termo".to_string(), "Termo de metal".to_string(), Categoria::Otros);
+            sistema.crear_publicacion(0, 1000, 4);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(bob);
+            sistema.registrar_usuario(String::from("Charlie"), String::from("Surname"), String::from("charlie.email"), Rol::Comprador);
+            sistema.generar_orden_compra(vec![(0, 1)],4000);
+
+            ink::env::test::set_caller::<ink::env::DefaultEnvironment>(alice);
+            let cantidades_ordenes = sistema.cantidad_ordenes_por_usuario().unwrap();
+
+            let ordenes_alice = cantidades_ordenes.clone()
+            .into_iter()
+            .find(|(id, _)| *id == alice)
+            .map(|(_, ordenes)| ordenes)
+            .unwrap();
+
+            let ordenes_bob = cantidades_ordenes.clone()
+            .into_iter()
+            .find(|(id, _)| *id == bob)
+            .map(|(_, ordenes)| ordenes)
+            .unwrap();
+
+            assert_eq!(cantidades_ordenes.len(), 2); // Hay dos usuarios registrados, habrá dos tuplas en el vector
+            assert_eq!(ordenes_alice, 1); // Alice tiene 1 ordene, como vendedor
+            assert_eq!(ordenes_bob, 1); // Bob tiene 1 orden, como comprador
         }
 
     }

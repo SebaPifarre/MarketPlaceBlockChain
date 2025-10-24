@@ -133,13 +133,13 @@ Un `enum` que describe el ciclo de vida de una orden de compra:
 
 ### ReportesView
 
-- **`consultar_top_5_vendedores()`**: Devuelve hasta 5 usuarios (Vendedor/Ambos) ordenados por puntaje como vendedor. (Result<Vec<Usuario>, ErrorSistema> si la verificación remota falla)
+- **`consultar_top_5_vendedores()`**: Devuelve hasta 5 usuarios (Vendedor/Ambos) ordenados por puntaje como vendedor.
 - **`consultar_top_5_compradores()`**: Devuelve hasta 5 usuarios (Comprador/Ambos) ordenados por puntaje como comprador.
-- **`ver_productos_mas_vendidos(categoria)`**: Devuelve Vec<(id_producto, ventas)> ordenado descendente (top 10).
-- **`estadisticas_por_categoria()`**: Result<Vec<(Categoria, total_ventas: u32, promedio_puntuacion: u8)>, ErrorSistema> — ventas y promedio por categoría; puede devolver ErrorSistema en caso de overflow.
+- **`ver_productos_mas_vendidos(categoria)`**: Devuelve el top 10 de productos vendidos ordenado de forma descendente.
+- **`estadisticas_por_categoria()`**: Devuelve ventas y promedio de una categoría.
 
 ## Ejecución de tests
-Con el comando **`cargo test --lib`**.
+Con el comando **`cargo tarpaulin --target-dir src/coverage --skip-clean --exclude-files=target/debug* --out html`**.
 
 ## Compilación
 **`./build.sh`** para ambos contratos.
