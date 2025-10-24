@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std, no_main)]
 
-pub use self::usuarios_sistema::{
+// Exportación de las estructuras para su uso en ReportesView
+pub use self::Marketplace::{
     Sistema,
     SistemaRef,
     Usuario,
@@ -9,7 +10,7 @@ pub use self::usuarios_sistema::{
 };
 
 #[ink::contract]
-mod usuarios_sistema {
+mod Marketplace {
 
     use ink::prelude::{string::String};
     use ink::storage::Mapping;   

@@ -1,12 +1,17 @@
 [package]
 name = "ReportesView"
 version = "0.1.0"
-authors = ["[your_name] <[your_email]>"]
-edition = "2021"
+description = "Contrato de estadísticas (solo lectura)"
+authors = [
+    "Benjamín",
+    "Joaquín",
+    "Julieta",
+    "Sebastián",
+]
 
 [dependencies]
 ink = { version = "5.1.1", default-features = false }
-MarketPlace = { path = "..", default-features = false, features = ["ink-as-dependency"] }
+Marketplace = { path = "..", default-features = false, features = ["ink-as-dependency"] }
 base64ct = "= 1.6.0"
 
 [dev-dependencies]
@@ -19,7 +24,7 @@ path = "lib.rs"
 default = ["std"]
 std = [
     "ink/std",
-    "MarketPlace/std"
+    "Marketplace/std"
 ]
 ink-as-dependency = []
 e2e-tests = []

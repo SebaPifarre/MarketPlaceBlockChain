@@ -5,7 +5,7 @@ mod ReportesView {
     use ink::codegen::TraitCallBuilder;
     use ink::prelude::vec::Vec;
     
-    use MarketPlace::{
+    use Marketplace::{
         SistemaRef,
         Usuario,
         ErrorSistema,
