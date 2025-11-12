@@ -1,7 +1,7 @@
 #!/bin/bash
 
 compilar_contrato() {
-    cargo +nightly-2024-05-20 contract build
+    cargo contract build
 }
 
 mostrar_ayuda() {
