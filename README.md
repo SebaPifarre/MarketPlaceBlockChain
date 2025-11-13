@@ -6,19 +6,19 @@ Proyecto del grupo 1 para el seminario Rust 2025. [Enunciado](https://gist.githu
 
 ### Marketplace
 
-Address: pendiente de despliegue
+Address: bH1yenq5V4XfTKgH3u6AvjoLNH4d4sMVdbcFxG1XrAQu9L4
 
-Code hash: pendiente de despliegue
+Code hash: 0xd692f4f6cc500b6d7c1e3440a5c7f74c027841a3851ed6837b41b78ebfb19ce7
 
-Contract hash: pendiente de despliegue
+Contract hash: 0x6341fa7fc564c9d4ea6081b2d1ddf2aa4b96d13571e0cee6d4b2ce10194d96bc
 
 ### ReportesView
 
-Address: pendiente de despliegue
+Address: YH5EGre4k7UsBmKQhfhtbhHiDJpXiLMSDZJkk7c1oucCGnN
 
-Code hash: pendiente de despliegue
+Code hash: 0x106efd3b7b68dd3fcdeb1d94564254498dd9939fcef40ee5243eabff92a57f8f
 
-Contract hash: pendiente de despliegue
+Contract hash: 0x39f790990765a40d1046949d05ad0d642c514b864c2d1f49ec11c3169d3a442c
 
 ## Primera entrega (Marketplace)
 

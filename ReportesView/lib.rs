@@ -4,6 +4,7 @@
 mod ReportesView {
     use ink::codegen::TraitCallBuilder;
     use ink::prelude::vec::Vec;
+    use ink::env::call::FromAccountId;
     
     use MarketPlace::{
         SistemaRef,
@@ -22,12 +23,8 @@ mod ReportesView {
         // Instancia el marketplace y lo devuelve contenido en una estructura
         // para referenciarlo
         #[ink(constructor)]
-        pub fn new(marketplace_code_hash: Hash) -> Self {
-            let marketplace = SistemaRef::new()
-                .code_hash(marketplace_code_hash)
-                .endowment(0)
-                .salt_bytes([0xDE, 0xAD, 0xBE, 0xEF]) // Salt arbitrario
-                .instantiate();
+        pub fn new(marketplace_account_id: AccountId) -> Self {
+            let marketplace = SistemaRef::from_account_id(marketplace_account_id);
 
             Self { marketplace }
         }
